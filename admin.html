@@ -4,165 +4,106 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin Panel - Đường Gia Phát</title>
-  <meta
-    name="description"
-    content="Bảng quản trị Đường Gia Phát để kiểm soát dữ liệu sản phẩm và người dùng."
-  />
+  <meta name="description" content="Bảng quản trị Đường Gia Phát theo schema database." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-    rel="stylesheet"
-  />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="admin/admin.css" />
 </head>
-<body data-theme="light">
-  <div class="site-shell admin-shell">
-    <header class="admin-header">
-      <div class="container admin-header__inner">
-        <div class="admin-header__brand">
-          <a href="index.html" class="admin-header__logo" aria-label="Đường Gia Phát">
-            <img src="assets/logo.svg" alt="Đường Gia Phát" class="admin-header__logo-image" />
-            <div class="admin-header__text">
-              <strong>Đường Gia Phát</strong>
-              <span>Admin Panel</span>
-            </div>
-          </a>
+<body data-theme="light" class="admin-shell">
+  <header class="admin-header">
+    <div class="container admin-header__inner">
+      <a href="index.html" class="admin-header__logo" aria-label="Đường Gia Phát">
+        <img src="assets/logo.svg" alt="Đường Gia Phát" class="admin-header__logo-image" />
+        <div class="admin-header__text">
+          <strong>Đường Gia Phát</strong>
+          <span>Admin Control Center</span>
+        </div>
+      </a>
+
+      <div class="admin-header__actions">
+        <button type="button" class="theme-toggle" id="adminThemeToggle" aria-label="Đổi giao diện sáng tối">
+          <span class="theme-toggle__icon" id="adminThemeToggleIcon">🌙</span>
+          <span class="theme-toggle__text" id="adminThemeToggleText">Dark mode</span>
+        </button>
+        <a href="index.html" class="btn btn--light">Trang chủ</a>
+        <a href="account.html" class="btn btn--primary">Tài khoản</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="admin-page">
+    <section class="admin-hero">
+      <div class="container admin-hero__grid">
+        <div class="admin-hero__content">
+          <span class="section-kicker">Admin Panel</span>
+          <h1>Điều khiển toàn bộ hệ thống trong một màn hình</h1>
+          <p>Quản lý products, users, orders, categories, banners, coupons, reviews, warranties và inventory theo đúng database.</p>
+          <div class="admin-hero__metrics">
+            <article class="admin-stat-card"><span class="admin-stat-card__label">Products</span><strong id="statProducts">0</strong></article>
+            <article class="admin-stat-card"><span class="admin-stat-card__label">Orders</span><strong id="statOrders">0</strong></article>
+            <article class="admin-stat-card"><span class="admin-stat-card__label">Users</span><strong id="statUsers">0</strong></article>
+            <article class="admin-stat-card"><span class="admin-stat-card__label">Coupons</span><strong id="statCoupons">0</strong></article>
+          </div>
         </div>
 
-        <div class="admin-header__actions">
-          <button type="button" class="theme-toggle theme-toggle--admin" id="adminThemeToggle" aria-label="Đổi giao diện sáng tối">
-            <span class="theme-toggle__icon" id="adminThemeToggleIcon">🌙</span>
-            <span class="theme-toggle__text" id="adminThemeToggleText">Dark mode</span>
-          </button>
-          <a href="index.html" class="btn btn--light">Về trang chủ</a>
-          <a href="account.html" class="btn btn--primary">Tài khoản</a>
+        <div class="admin-hero__stats">
+          <article class="admin-card"><span class="admin-card__label">Danh mục nổi bật</span><strong id="statTopCategory">---</strong></article>
+          <article class="admin-card"><span class="admin-card__label">Sản phẩm active</span><strong id="statActiveProducts">0</strong></article>
+          <article class="admin-card"><span class="admin-card__label">Đơn chờ xử lý</span><strong id="statPendingOrders">0</strong></article>
+          <article class="admin-card"><span class="admin-card__label">Banner active</span><strong id="statActiveBanners">0</strong></article>
         </div>
       </div>
-    </header>
+    </section>
 
-    <main class="admin-page">
-      <section class="admin-hero">
-        <div class="container admin-hero__grid">
-          <div class="admin-hero__content">
-            <span class="section-kicker">Admin Panel</span>
-            <h1>Quản lý dữ liệu và sản phẩm</h1>
-            <p>
-              Theo dõi nhanh sản phẩm, người dùng và các dữ liệu quan trọng của dự án trong một nơi duy nhất.
-            </p>
-          </div>
-
-          <div class="admin-hero__stats">
-            <article class="admin-stat-card">
-              <span class="admin-stat-card__label">Tổng sản phẩm</span>
-              <strong id="adminTotalProducts">0</strong>
-            </article>
-            <article class="admin-stat-card">
-              <span class="admin-stat-card__label">Sản phẩm active</span>
-              <strong id="adminActiveProducts">0</strong>
-            </article>
-            <article class="admin-stat-card">
-              <span class="admin-stat-card__label">Tổng user</span>
-              <strong id="adminTotalUsers">0</strong>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="admin-layout">
-        <div class="container admin-layout__grid">
-          <aside class="admin-sidebar">
+    <section class="admin-layout">
+      <div class="container admin-layout__grid">
+        <aside class="admin-sidebar">
+          <div class="admin-sidebar__panel">
+            <div class="admin-sidebar__title">
+              <span class="section-kicker">Navigation</span>
+              <h2>Modules</h2>
+            </div>
             <nav class="admin-nav" aria-label="Điều hướng admin">
               <a href="#dashboard" class="admin-nav__link is-active" data-admin-tab="dashboard">Dashboard</a>
+              <a href="#categories" class="admin-nav__link" data-admin-tab="categories">Categories</a>
               <a href="#products" class="admin-nav__link" data-admin-tab="products">Products</a>
+              <a href="#inventory" class="admin-nav__link" data-admin-tab="inventory">Inventory</a>
               <a href="#orders" class="admin-nav__link" data-admin-tab="orders">Orders</a>
               <a href="#users" class="admin-nav__link" data-admin-tab="users">Users</a>
-              <a href="#marketing" class="admin-nav__link" data-admin-tab="marketing">Marketing</a>
-              <a href="#settings" class="admin-nav__link" data-admin-tab="settings">Settings</a>
+              <a href="#coupons" class="admin-nav__link" data-admin-tab="coupons">Coupons</a>
+              <a href="#banners" class="admin-nav__link" data-admin-tab="banners">Banners</a>
+              <a href="#reviews" class="admin-nav__link" data-admin-tab="reviews">Reviews</a>
+              <a href="#warranties" class="admin-nav__link" data-admin-tab="warranties">Warranties</a>
             </nav>
-          </aside>
+          </div>
+        </aside>
 
-          <section class="admin-content">
-            <article class="admin-panel" id="adminDashboardPanel">
-              <div class="admin-panel__header">
+        <section class="admin-content">
+          <article class="admin-panel admin-panel--featured" id="panel-dashboard">
+            <div class="admin-panel__header">
+              <div>
+                <span class="section-kicker">Dashboard</span>
+                <h2>Tổng quan hệ thống</h2>
+              </div>
+              <button class="btn btn--light" id="refreshAdminData" type="button">Làm mới</button>
+            </div>
+
+            <div class="admin-grid admin-grid--compact">
+              <article class="admin-card"><span class="admin-card__label">Gaming Laptop</span><strong id="countGamingLaptop">0</strong></article>
+              <article class="admin-card"><span class="admin-card__label">Office Laptop</span><strong id="countOfficeLaptop">0</strong></article>
+              <article class="admin-card"><span class="admin-card__label">Gaming PC</span><strong id="countGamingPc">0</strong></article>
+              <article class="admin-card"><span class="admin-card__label">Accessory</span><strong id="countAccessory">0</strong></article>
+            </div>
+
+            <div class="admin-table-card">
+              <div class="admin-table-card__head">
                 <div>
-                  <span class="section-kicker">Dashboard</span>
-                  <h2>Tổng quan nhanh</h2>
-                </div>
-                <button type="button" class="btn btn--light" id="refreshAdminData">Làm mới dữ liệu</button>
-              </div>
-
-
-              <div class="admin-grid admin-grid--product-summary">
-                <article class="admin-card">
-                  <span class="admin-card__label">Gaming Laptop</span>
-                  <strong id="adminCategoryGamingLaptop">0 sản phẩm</strong>
-                  <span class="admin-card__meta">Dữ liệu lấy từ MySQL</span>
-                </article>
-                <article class="admin-card">
-                  <span class="admin-card__label">Office Laptop</span>
-                  <strong id="adminCategoryOfficeLaptop">0 sản phẩm</strong>
-                  <span class="admin-card__meta">Dữ liệu lấy từ MySQL</span>
-                </article>
-                <article class="admin-card">
-                  <span class="admin-card__label">Gaming PC</span>
-                  <strong id="adminCategoryGamingPc">0 sản phẩm</strong>
-                  <span class="admin-card__meta">Dữ liệu lấy từ MySQL</span>
-                </article>
-                <article class="admin-card">
-                  <span class="admin-card__label">Accessory</span>
-                  <strong id="adminCategoryAccessory">0 sản phẩm</strong>
-                  <span class="admin-card__meta">Dữ liệu lấy từ MySQL</span>
-                </article>
-              </div>
-
-              <div class="admin-settings admin-settings--dashboard">
-                <div class="admin-panel__header">
-                  <div>
-                    <span class="section-kicker">Products snapshot</span>
-                    <h3>Danh sách sản phẩm mới nhất</h3>
-                  </div>
-                </div>
-                <div class="table-wrap">
-                  <table class="admin-table">
-                    <thead>
-                      <tr>
-                        <th>Tên</th>
-                        <th>Danh mục</th>
-                        <th>Giá</th>
-                        <th>Tồn kho</th>
-                      </tr>
-                    </thead>
-                    <tbody id="adminDashboardProductsTable">
-                      <tr>
-                        <td colspan="4" class="admin-table__empty">Chưa có dữ liệu sản phẩm.</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  <span class="section-kicker">Overview</span>
+                  <h3>Sản phẩm gần đây</h3>
                 </div>
               </div>
-            </article>
-
-            <article class="admin-panel" id="adminProductsPanel">
-              <div class="admin-panel__header">
-                <div>
-                  <span class="section-kicker">Products</span>
-                  <h2>Danh sách sản phẩm</h2>
-                </div>
-                <button type="button" class="btn btn--primary" id="openAddProductForm">+ Thêm sản phẩm</button>
-              </div>
-
-              <div class="admin-toolbar">
-                <input type="search" id="productSearch" placeholder="Tìm theo tên sản phẩm..." />
-                <select id="productCategoryFilter">
-                  <option value="all">Tất cả danh mục</option>
-                  <option value="gaming-laptop">Gaming Laptop</option>
-                  <option value="office-laptop">Office Laptop</option>
-                  <option value="gaming-pc">Gaming PC</option>
-                  <option value="accessory">Accessory</option>
-                </select>
-              </div>
-
               <div class="table-wrap">
                 <table class="admin-table">
                   <thead>
@@ -171,168 +112,253 @@
                       <th>Danh mục</th>
                       <th>Giá</th>
                       <th>Tồn kho</th>
-                      <th>Trạng thái</th>
-                      <th>Hành động</th>
                     </tr>
                   </thead>
-                  <tbody id="adminProductsTable">
-                    <tr>
-                      <td colspan="6" class="admin-table__empty">Chưa có dữ liệu sản phẩm.</td>
-                    </tr>
+                  <tbody id="dashboardProductsTable">
+                    <tr><td colspan="4" class="admin-table__empty">Chưa có dữ liệu.</td></tr>
                   </tbody>
                 </table>
               </div>
-            </article>
+            </div>
+          </article>
 
-            <article class="admin-panel" id="adminOrdersPanel">
-              <div class="admin-panel__header">
-                <div>
-                  <span class="section-kicker">Orders</span>
-                  <h2>Danh sách đơn hàng</h2>
-                </div>
-                <button type="button" class="btn btn--primary" id="openAddOrderForm">+ Tạo đơn hàng</button>
-              </div>
+          <article class="admin-panel" id="panel-products">
+            <div class="admin-panel__header">
+              <div><span class="section-kicker">Products</span><h2>Sản phẩm</h2></div>
+              <button class="btn btn--primary" id="openAddProductForm" type="button">+ Thêm sản phẩm</button>
+            </div>
+            <div class="admin-toolbar">
+              <input type="search" id="productSearch" placeholder="Tìm theo tên, SKU, brand..." />
+              <select id="productCategoryFilter">
+                <option value="all">Tất cả danh mục</option>
+                <option value="gaming-laptop">Gaming Laptop</option>
+                <option value="office-laptop">Office Laptop</option>
+                <option value="gaming-pc">Gaming PC</option>
+                <option value="accessory">Accessory</option>
+              </select>
+            </div>
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Tên</th>
+                    <th>SKU</th>
+                    <th>Danh mục</th>
+                    <th>Giá</th>
+                    <th>Sale</th>
+                    <th>Tồn kho</th>
+                    <th>Featured</th>
+                    <th>Active</th>
+                    <th>Hành động</th>
+                  </tr>
+                </thead>
+                <tbody id="productsTable">
+                  <tr><td colspan="9" class="admin-table__empty">Chưa có dữ liệu.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
 
-              <div class="admin-toolbar">
-                <input type="search" id="orderSearch" placeholder="Tìm theo mã đơn hàng..." />
-              </div>
+          <article class="admin-panel" id="panel-categories">
+            <div class="admin-panel__header">
+              <div><span class="section-kicker">Categories</span><h2>Danh mục</h2></div>
+              <button class="btn btn--primary" id="openAddCategoryForm" type="button">+ Thêm danh mục</button>
+            </div>
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Tên</th>
+                    <th>Slug</th>
+                    <th>Parent</th>
+                    <th>Sort</th>
+                    <th>Active</th>
+                    <th>Hành động</th>
+                  </tr>
+                </thead>
+                <tbody id="categoriesTable">
+                  <tr><td colspan="6" class="admin-table__empty">Chưa có dữ liệu.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
 
-              <div class="table-wrap">
-                <table class="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Mã đơn</th>
-                      <th>Khách hàng</th>
-                      <th>Sản phẩm</th>
-                      <th>Tổng tiền</th>
-                      <th>Trạng thái</th>
-                      <th>Ngày tạo</th>
-                      <th>Hành động</th>
-                    </tr>
-                  </thead>
-                  <tbody id="adminOrdersTable">
-                    <tr>
-                      <td colspan="6" class="admin-table__empty">Đang tải dữ liệu đơn hàng.</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </article>
+          <article class="admin-panel" id="panel-inventory">
+            <div class="admin-panel__header"><div><span class="section-kicker">Inventory</span><h2>Tồn kho</h2></div></div>
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Sản phẩm</th>
+                    <th>Kho</th>
+                    <th>Qty</th>
+                    <th>Reserved</th>
+                  </tr>
+                </thead>
+                <tbody id="inventoryTable">
+                  <tr><td colspan="4" class="admin-table__empty">Chưa có dữ liệu.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
 
-            <article class="admin-panel" id="adminUsersPanel">
-              <div class="admin-panel__header">
-                <div>
-                  <span class="section-kicker">Users</span>
-                  <h2>Danh sách người dùng</h2>
-                </div>
-              </div>
+          <article class="admin-panel" id="panel-orders">
+            <div class="admin-panel__header">
+              <div><span class="section-kicker">Orders</span><h2>Đơn hàng</h2></div>
+              <button class="btn btn--primary" id="openAddOrderForm" type="button">+ Tạo đơn hàng</button>
+            </div>
+            <div class="admin-toolbar">
+              <input type="search" id="orderSearch" placeholder="Tìm theo mã đơn, tên khách..." />
+            </div>
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Mã</th>
+                    <th>Khách</th>
+                    <th>Điện thoại</th>
+                    <th>Tổng</th>
+                    <th>Status</th>
+                    <th>Payment</th>
+                    <th>Ngày tạo</th>
+                    <th>Hành động</th>
+                  </tr>
+                </thead>
+                <tbody id="ordersTable">
+                  <tr><td colspan="8" class="admin-table__empty">Chưa có dữ liệu.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
 
-              <div class="table-wrap">
-                <table class="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Tên</th>
-                      <th>Email</th>
-                      <th>Role</th>
-                      <th>Số điện thoại</th>
-                      <th>Hành động</th>
-                    </tr>
-                  </thead>
-                  <tbody id="adminUsersTable">
-                    <tr>
-                      <td colspan="5" class="admin-table__empty">Chưa có dữ liệu người dùng.</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </article>
+          <article class="admin-panel" id="panel-users">
+            <div class="admin-panel__header"><div><span class="section-kicker">Users</span><h2>Người dùng</h2></div></div>
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Tên</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Phone</th>
+                    <th>Active</th>
+                    <th>Hành động</th>
+                  </tr>
+                </thead>
+                <tbody id="usersTable">
+                  <tr><td colspan="6" class="admin-table__empty">Chưa có dữ liệu.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
 
-            <article class="admin-panel" id="adminMarketingPanel">
-              <div class="admin-panel__header">
-                <div>
-                  <span class="section-kicker">Marketing</span>
-                  <h2>Banner và khuyến mãi</h2>
-                </div>
-              </div>
+          <article class="admin-panel" id="panel-coupons">
+            <div class="admin-panel__header"><div><span class="section-kicker">Coupons</span><h2>Mã giảm giá</h2></div></div>
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Code</th>
+                    <th>Tên</th>
+                    <th>Type</th>
+                    <th>Value</th>
+                    <th>Limit</th>
+                    <th>Used</th>
+                    <th>Active</th>
+                  </tr>
+                </thead>
+                <tbody id="couponsTable">
+                  <tr><td colspan="7" class="admin-table__empty">Chưa có dữ liệu.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
 
-              <div class="admin-settings">
-                <p>
-                  Khu vực này sẽ dùng để quản lý banner, flash sale, danh mục nổi bật và mã giảm giá.
-                </p>
-              </div>
-            </article>
+          <article class="admin-panel" id="panel-banners">
+            <div class="admin-panel__header"><div><span class="section-kicker">Banners</span><h2>Banner</h2></div></div>
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th>Position</th>
+                    <th>Sort</th>
+                    <th>Active</th>
+                    <th>Link</th>
+                  </tr>
+                </thead>
+                <tbody id="bannersTable">
+                  <tr><td colspan="5" class="admin-table__empty">Chưa có dữ liệu.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
 
-            <article class="admin-panel" id="adminSettingsPanel">
-              <div class="admin-panel__header">
-                <div>
-                  <span class="section-kicker">Settings</span>
-                  <h2>Cấu hình nhanh</h2>
-                </div>
-              </div>
+          <article class="admin-panel" id="panel-reviews">
+            <div class="admin-panel__header"><div><span class="section-kicker">Reviews</span><h2>Đánh giá</h2></div></div>
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>User</th>
+                    <th>Product</th>
+                    <th>Rating</th>
+                    <th>Visible</th>
+                    <th>Comment</th>
+                  </tr>
+                </thead>
+                <tbody id="reviewsTable">
+                  <tr><td colspan="5" class="admin-table__empty">Chưa có dữ liệu.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
 
-              <div class="admin-settings">
-                <p>
-                  Đây là khu vực dành cho cấu hình hệ thống sau này như phân quyền, thông báo, upload ảnh và cài đặt hiển thị.
-                </p>
-              </div>
-            </article>
-          </section>
-        </div>
-      </section>
-    </main>
-
-    <div id="siteFooter"></div>
-  </div>
+          <article class="admin-panel" id="panel-warranties">
+            <div class="admin-panel__header"><div><span class="section-kicker">Warranties</span><h2>Bảo hành</h2></div></div>
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Code</th>
+                    <th>Order Item</th>
+                    <th>Start</th>
+                    <th>End</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="warrantiesTable">
+                  <tr><td colspan="5" class="admin-table__empty">Chưa có dữ liệu.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+      </div>
+    </section>
+  </main>
 
   <div class="backdrop" id="globalBackdrop" hidden></div>
 
-  <div class="modal" id="adminOrderModal" aria-hidden="true">
-    <div class="modal__overlay" data-close-modal="adminOrderModal"></div>
-    <div class="modal__content modal__content--auth" role="dialog" aria-modal="true" aria-labelledby="adminOrderModalTitle">
-      <button type="button" class="modal__close" data-close-modal="adminOrderModal" aria-label="Đóng form">✕</button>
+  <div class="modal" id="adminCategoryModal" aria-hidden="true">
+    <div class="modal__overlay" data-close-modal="adminCategoryModal"></div>
+    <div class="modal__content modal__content--auth" role="dialog" aria-modal="true" aria-labelledby="adminCategoryModalTitle">
+      <button type="button" class="modal__close" data-close-modal="adminCategoryModal" aria-label="Đóng form">✕</button>
       <div class="auth-panel">
         <div class="auth-panel__header">
-          <span class="section-kicker">Orders</span>
-          <h3 id="adminOrderModalTitle">Tạo / sửa đơn hàng</h3>
-          <p>Form quản trị để tạo và cập nhật đơn hàng.</p>
+          <span class="section-kicker">Categories</span>
+          <h3 id="adminCategoryModalTitle">Thêm / sửa danh mục</h3>
+          <p>Quản lý theo bảng categories trong MySQL.</p>
         </div>
-
-        <form class="auth-form" id="adminOrderForm">
-          <label>
-            <span>Mã đơn hàng</span>
-            <input type="text" id="adminOrderCode" placeholder="VD: DH-0002" />
-          </label>
-
-          <label>
-            <span>Tên khách hàng</span>
-            <input type="text" id="adminOrderCustomer" placeholder="Nguyễn Văn A" />
-          </label>
-
-          <label>
-            <span>Sản phẩm</span>
-            <select id="adminOrderProducts">
-              <option value="">Đang tải danh sách sản phẩm...</option>
-            </select>
-          </label>
-
-          <label>
-            <span>Tổng tiền</span>
-            <input type="number" id="adminOrderTotal" placeholder="0" />
-          </label>
-
-          <label>
-            <span>Trạng thái</span>
-            <select id="adminOrderStatus">
-              <option value="pending">Chờ xác nhận</option>
-              <option value="shipping">Đang giao</option>
-              <option value="completed">Hoàn thành</option>
-              <option value="cancelled">Đã huỷ</option>
-            </select>
-          </label>
-
-          <button type="submit" class="btn btn--primary btn--block">Lưu đơn hàng</button>
-          <button type="button" class="btn btn--light btn--block" data-close-modal="adminOrderModal">Đóng</button>
-          <p class="auth-status" id="adminOrderStatusText" aria-live="polite"></p>
+        <form class="auth-form" id="adminCategoryForm">
+          <label><span>Tên</span><input id="adminCategoryName" type="text" /></label>
+          <label><span>Slug</span><input id="adminCategorySlug" type="text" /></label>
+          <label><span>Parent ID</span><input id="adminCategoryParent" type="number" /></label>
+          <label><span>Sort order</span><input id="adminCategorySort" type="number" /></label>
+          <label class="checkbox-line"><input id="adminCategoryActive" type="checkbox" checked /> <span>Active</span></label>
+          <button type="submit" class="btn btn--primary btn--block">Lưu danh mục</button>
+          <button type="button" class="btn btn--light btn--block" data-close-modal="adminCategoryModal">Đóng</button>
+          <p class="auth-status" id="adminCategoryStatus" aria-live="polite"></p>
         </form>
       </div>
     </div>
@@ -346,61 +372,53 @@
         <div class="auth-panel__header">
           <span class="section-kicker">Products</span>
           <h3 id="adminProductModalTitle">Thêm / sửa sản phẩm</h3>
-          <p>Form mẫu để quản trị sản phẩm trong dự án.</p>
+          <p>Quản lý theo cột trong bảng products.</p>
         </div>
-
         <form class="auth-form" id="adminProductForm">
-          <label>
-            <span>Tên sản phẩm</span>
-            <input type="text" id="adminProductName" placeholder="Nhập tên sản phẩm" />
-          </label>
-
-          <label>
-            <span>Danh mục</span>
-            <select id="adminProductCategory">
-              <option value="gaming-laptop">Gaming Laptop</option>
-              <option value="office-laptop">Office Laptop</option>
-              <option value="gaming-pc">Gaming PC</option>
-              <option value="accessory">Accessory</option>
-            </select>
-          </label>
-
-          <label>
-            <span>Giá</span>
-            <input type="number" id="adminProductPrice" placeholder="0" />
-          </label>
-
-          <label>
-            <span>Tồn kho</span>
-            <input type="number" id="adminProductStock" placeholder="0" />
-          </label>
-
-          <div class="auth-form__group auth-form__group--highlight">
-            <span class="auth-form__group-title">Khu vực lưu ảnh</span>
-            <p class="auth-form__group-note">Chọn danh mục và thư mục con để ảnh được lưu vào khu vực mới tương ứng.</p>
-            <select id="adminProductImageCategory">
-              <option value="gaming-laptop">Gaming Laptop</option>
-              <option value="office-laptop">Office Laptop</option>
-              <option value="gaming-pc">Gaming PC</option>
-              <option value="accessory">Accessory</option>
-            </select>
-            <input type="text" id="adminProductImageFolder" placeholder="Tên thư mục mới, ví dụ: asus-rog" />
-          </div>
-
-          <label>
-            <span>Ảnh sản phẩm</span>
-            <input type="file" id="adminProductImageFile" accept="image/*" />
-          </label>
-          <p class="auth-status auth-status--hint">Ảnh sẽ được lưu vào đúng khu vực bạn chọn ở trên.</p>
-
-          <label>
-            <span>Đường dẫn ảnh</span>
-            <input type="text" id="adminProductImage" placeholder="Link hoặc đường dẫn ảnh sau khi upload" />
-          </label>
-
+          <label><span>Tên</span><input id="adminProductName" type="text" /></label>
+          <label><span>Slug</span><input id="adminProductSlug" type="text" /></label>
+          <label><span>Category</span><select id="adminProductCategory"><option value="gaming-laptop">Gaming Laptop</option><option value="office-laptop">Office Laptop</option><option value="gaming-pc">Gaming PC</option><option value="accessory">Accessory</option></select></label>
+          <label><span>Brand</span><input id="adminProductBrand" type="text" /></label>
+          <label><span>SKU</span><input id="adminProductSku" type="text" /></label>
+          <label><span>Giá</span><input id="adminProductPrice" type="number" /></label>
+          <label><span>Sale price</span><input id="adminProductSalePrice" type="number" /></label>
+          <label><span>Tồn kho</span><input id="adminProductStock" type="number" /></label>
+          <label><span>Ảnh</span><input id="adminProductImage" type="text" /></label>
+          <label><span>Mô tả ngắn</span><input id="adminProductShortDescription" type="text" /></label>
+          <label><span>Mô tả</span><input id="adminProductDescription" type="text" /></label>
+          <label class="checkbox-line"><input id="adminProductFeatured" type="checkbox" /> <span>Nổi bật</span></label>
+          <label class="checkbox-line"><input id="adminProductActive" type="checkbox" checked /> <span>Active</span></label>
           <button type="submit" class="btn btn--primary btn--block">Lưu sản phẩm</button>
           <button type="button" class="btn btn--light btn--block" data-close-modal="adminProductModal">Đóng</button>
           <p class="auth-status" id="adminProductStatus" aria-live="polite"></p>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="adminOrderModal" aria-hidden="true">
+    <div class="modal__overlay" data-close-modal="adminOrderModal"></div>
+    <div class="modal__content modal__content--auth" role="dialog" aria-modal="true" aria-labelledby="adminOrderModalTitle">
+      <button type="button" class="modal__close" data-close-modal="adminOrderModal" aria-label="Đóng form">✕</button>
+      <div class="auth-panel">
+        <div class="auth-panel__header">
+          <span class="section-kicker">Orders</span>
+          <h3 id="adminOrderModalTitle">Tạo / sửa đơn hàng</h3>
+          <p>Quản lý theo cột trong bảng orders.</p>
+        </div>
+        <form class="auth-form" id="adminOrderForm">
+          <label><span>Mã đơn</span><input id="adminOrderCode" type="text" /></label>
+          <label><span>Khách hàng</span><input id="adminOrderCustomer" type="text" /></label>
+          <label><span>Điện thoại</span><input id="adminOrderPhone" type="text" /></label>
+          <label><span>Địa chỉ</span><input id="adminOrderAddress" type="text" /></label>
+          <label><span>Ghi chú</span><input id="adminOrderNote" type="text" /></label>
+          <label><span>Tổng tiền</span><input id="adminOrderTotal" type="number" /></label>
+          <label><span>Status</span><select id="adminOrderStatus"><option value="pending">pending</option><option value="shipping">shipping</option><option value="completed">completed</option><option value="cancelled">cancelled</option></select></label>
+          <label><span>Payment status</span><select id="adminOrderPaymentStatus"><option value="unpaid">unpaid</option><option value="pending">pending</option><option value="paid">paid</option><option value="refunded">refunded</option></select></label>
+          <label><span>Payment method</span><select id="adminOrderPaymentMethod"><option value="cod">cod</option><option value="bank_transfer">bank_transfer</option><option value="momo">momo</option></select></label>
+          <button type="submit" class="btn btn--primary btn--block">Lưu đơn hàng</button>
+          <button type="button" class="btn btn--light btn--block" data-close-modal="adminOrderModal">Đóng</button>
+          <p class="auth-status" id="adminOrderStatusText" aria-live="polite"></p>
         </form>
       </div>
     </div>
@@ -414,33 +432,14 @@
         <div class="auth-panel__header">
           <span class="section-kicker">Users</span>
           <h3 id="adminUserModalTitle">Sửa thông tin tài khoản</h3>
-          <p>Chỉnh sửa tên, email, role và số điện thoại của tài khoản.</p>
+          <p>Quản lý theo cột trong bảng users.</p>
         </div>
-
         <form class="auth-form" id="adminUserForm">
-          <label>
-            <span>Tên</span>
-            <input type="text" id="adminUserName" placeholder="Nhập tên người dùng" />
-          </label>
-
-          <label>
-            <span>Email</span>
-            <input type="email" id="adminUserEmail" placeholder="email@example.com" />
-          </label>
-
-          <label>
-            <span>Role</span>
-            <select id="adminUserRole">
-              <option value="user">User</option>
-              <option value="admin">Admin</option>
-            </select>
-          </label>
-
-          <label>
-            <span>Số điện thoại</span>
-            <input type="text" id="adminUserPhone" placeholder="0900000000" />
-          </label>
-
+          <label><span>Tên</span><input id="adminUserName" type="text" /></label>
+          <label><span>Email</span><input id="adminUserEmail" type="email" /></label>
+          <label><span>Role</span><select id="adminUserRole"><option value="user">user</option><option value="admin">admin</option></select></label>
+          <label><span>Phone</span><input id="adminUserPhone" type="text" /></label>
+          <label class="checkbox-line"><input id="adminUserActive" type="checkbox" checked /> <span>Active</span></label>
           <button type="submit" class="btn btn--primary btn--block">Lưu thay đổi</button>
           <button type="button" class="btn btn--light btn--block" data-close-modal="adminUserModal">Đóng</button>
           <p class="auth-status" id="adminUserStatus" aria-live="polite"></p>
@@ -450,10 +449,6 @@
   </div>
 
   <script src="js/components/layout.js"></script>
-  <script src="js/data/products/gaming-laptop.js"></script>
-  <script src="js/data/products/gaming-pc.js"></script>
-  <script src="js/data/products/office-laptop.js"></script>
-  <script src="js/data/products/accessory.js"></script>
   <script src="js/admin-page.js"></script>
   <script>
     (function () {
@@ -465,7 +460,7 @@
       function getStoredTheme() {
         try {
           return localStorage.getItem("theme") || "light";
-        } catch (error) {
+        } catch (e) {
           return "light";
         }
       }
@@ -473,7 +468,7 @@
       function setStoredTheme(theme) {
         try {
           localStorage.setItem("theme", theme);
-        } catch (error) {}
+        } catch (e) {}
       }
 
       function updateToggle(theme) {
@@ -487,15 +482,10 @@
         updateToggle(theme);
       }
 
-      const initialTheme = getStoredTheme();
-      applyTheme(initialTheme);
-
-      if (toggle) {
-        toggle.addEventListener("click", function () {
-          const nextTheme = body.getAttribute("data-theme") === "dark" ? "light" : "dark";
-          applyTheme(nextTheme);
-        });
-      }
+      applyTheme(getStoredTheme());
+      toggle?.addEventListener("click", () => {
+        applyTheme(body.getAttribute("data-theme") === "dark" ? "light" : "dark");
+      });
     })();
   </script>
 </body>

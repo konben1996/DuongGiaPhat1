@@ -1,82 +1,173 @@
 const API_BASE_URL = window.API_BASE_URL || window.location.origin;
-const productSources = Object.values(window.DuongGiaStoreProducts || {});
-const localProducts = productSources.flatMap((source) => source.products || []);
-const localProductGalleries = productSources.reduce(
-  (acc, source) => Object.assign(acc, source.productGalleries || {}),
-  {}
-);
 
-const elements = {
-  body: document.body,
-  adminNavLinks: [...document.querySelectorAll(".admin-nav__link")],
-  adminDashboardPanel: document.getElementById("adminDashboardPanel"),
-  adminProductsPanel: document.getElementById("adminProductsPanel"),
-  adminOrdersPanel: document.getElementById("adminOrdersPanel"),
-  adminUsersPanel: document.getElementById("adminUsersPanel"),
-  adminMarketingPanel: document.getElementById("adminMarketingPanel"),
-  adminSettingsPanel: document.getElementById("adminSettingsPanel"),
-  adminTotalProducts: document.getElementById("adminTotalProducts"),
-  adminActiveProducts: document.getElementById("adminActiveProducts"),
-  adminTotalUsers: document.getElementById("adminTotalUsers"),
-  adminTotalOrders: document.getElementById("adminTotalOrders"),
-  adminRecentProductName: document.getElementById("adminRecentProductName"),
-  adminRecentOrderName: document.getElementById("adminRecentOrderName"),
-  adminTopCategory: document.getElementById("adminTopCategory"),
-  adminSystemStatus: document.getElementById("adminSystemStatus"),
-  adminCategoryGamingLaptop: document.getElementById("adminCategoryGamingLaptop"),
-  adminCategoryOfficeLaptop: document.getElementById("adminCategoryOfficeLaptop"),
-  adminCategoryGamingPc: document.getElementById("adminCategoryGamingPc"),
-  adminCategoryAccessory: document.getElementById("adminCategoryAccessory"),
-  adminDashboardProductsTable: document.getElementById("adminDashboardProductsTable"),
+const LOCAL_PRODUCTS = Object.values(window.DuongGiaStoreProducts || {}).flatMap((group) => group.products || []);
+const LOCAL_GALLERIES = Object.values(window.DuongGiaStoreProducts || {}).reduce((acc, group) => Object.assign(acc, group.productGalleries || {}), {});
+
+const DEFAULT_CATEGORIES = [
+  { id: 1, name: "Laptop Gaming", slug: "gaming-laptop", parent_id: null, sort_order: 1, is_active: 1 },
+  { id: 2, name: "Laptop Văn Phòng", slug: "office-laptop", parent_id: null, sort_order: 2, is_active: 1 },
+  { id: 3, name: "Máy Tính Gaming", slug: "gaming-pc", parent_id: null, sort_order: 3, is_active: 1 },
+  { id: 4, name: "Phụ Kiện", slug: "accessory", parent_id: null, sort_order: 4, is_active: 1 },
+];
+
+const els = {
+  navLinks: [...document.querySelectorAll(".admin-nav__link")],
+  panels: {
+    dashboard: document.getElementById("panel-dashboard"),
+    categories: document.getElementById("panel-categories"),
+    products: document.getElementById("panel-products"),
+    inventory: document.getElementById("panel-inventory"),
+    orders: document.getElementById("panel-orders"),
+    users: document.getElementById("panel-users"),
+    coupons: document.getElementById("panel-coupons"),
+    banners: document.getElementById("panel-banners"),
+    reviews: document.getElementById("panel-reviews"),
+    warranties: document.getElementById("panel-warranties"),
+  },
   refreshAdminData: document.getElementById("refreshAdminData"),
   openAddProductForm: document.getElementById("openAddProductForm"),
-  adminProductModal: document.getElementById("adminProductModal"),
-  adminProductForm: document.getElementById("adminProductForm"),
-  adminProductName: document.getElementById("adminProductName"),
-  adminProductCategory: document.getElementById("adminProductCategory"),
-  adminProductPrice: document.getElementById("adminProductPrice"),
-  adminProductStock: document.getElementById("adminProductStock"),
-  adminProductImage: document.getElementById("adminProductImage"),
-  adminProductImageFile: document.getElementById("adminProductImageFile"),
-  adminProductImageCategory: document.getElementById("adminProductImageCategory"),
-  adminProductImageFolder: document.getElementById("adminProductImageFolder"),
-  adminProductStatus: document.getElementById("adminProductStatus"),
-  adminProductsTable: document.getElementById("adminProductsTable"),
-  adminUsersTable: document.getElementById("adminUsersTable"),
-  adminUserModal: document.getElementById("adminUserModal"),
-  adminUserForm: document.getElementById("adminUserForm"),
-  adminUserName: document.getElementById("adminUserName"),
-  adminUserEmail: document.getElementById("adminUserEmail"),
-  adminUserRole: document.getElementById("adminUserRole"),
-  adminUserPhone: document.getElementById("adminUserPhone"),
-  adminUserStatus: document.getElementById("adminUserStatus"),
-  adminOrderModal: document.getElementById("adminOrderModal"),
-  adminOrderForm: document.getElementById("adminOrderForm"),
-  adminOrderCode: document.getElementById("adminOrderCode"),
-  adminOrderCustomer: document.getElementById("adminOrderCustomer"),
-  adminOrderProducts: document.getElementById("adminOrderProducts"),
-  adminOrderTotal: document.getElementById("adminOrderTotal"),
-  adminOrderStatus: document.getElementById("adminOrderStatus"),
-  adminOrderStatusText: document.getElementById("adminOrderStatusText"),
+  openAddCategoryForm: document.getElementById("openAddCategoryForm"),
   openAddOrderForm: document.getElementById("openAddOrderForm"),
-  orderSearch: document.getElementById("orderSearch"),
+  categoryModal: document.getElementById("adminCategoryModal"),
+  categoryForm: document.getElementById("adminCategoryForm"),
+  categoryName: document.getElementById("adminCategoryName"),
+  categorySlug: document.getElementById("adminCategorySlug"),
+  categoryParent: document.getElementById("adminCategoryParent"),
+  categorySort: document.getElementById("adminCategorySort"),
+  categoryActive: document.getElementById("adminCategoryActive"),
+  categoryStatus: document.getElementById("adminCategoryStatus"),
   productSearch: document.getElementById("productSearch"),
   productCategoryFilter: document.getElementById("productCategoryFilter"),
+  orderSearch: document.getElementById("orderSearch"),
   globalBackdrop: document.getElementById("globalBackdrop"),
+
+  statProducts: document.getElementById("statProducts"),
+  statOrders: document.getElementById("statOrders"),
+  statUsers: document.getElementById("statUsers"),
+  statCoupons: document.getElementById("statCoupons"),
+  statTopCategory: document.getElementById("statTopCategory"),
+  statActiveProducts: document.getElementById("statActiveProducts"),
+  statPendingOrders: document.getElementById("statPendingOrders"),
+  statActiveBanners: document.getElementById("statActiveBanners"),
+  countGamingLaptop: document.getElementById("countGamingLaptop"),
+  countOfficeLaptop: document.getElementById("countOfficeLaptop"),
+  countGamingPc: document.getElementById("countGamingPc"),
+  countAccessory: document.getElementById("countAccessory"),
+  dashboardProductsTable: document.getElementById("dashboardProductsTable"),
+  productsTable: document.getElementById("productsTable"),
+  categoriesTable: document.getElementById("categoriesTable"),
+  inventoryTable: document.getElementById("inventoryTable"),
+  ordersTable: document.getElementById("ordersTable"),
+  usersTable: document.getElementById("usersTable"),
+  couponsTable: document.getElementById("couponsTable"),
+  bannersTable: document.getElementById("bannersTable"),
+  reviewsTable: document.getElementById("reviewsTable"),
+  warrantiesTable: document.getElementById("warrantiesTable"),
+
+  categoryModal: document.getElementById("adminCategoryModal"),
+  categoryForm: document.getElementById("adminCategoryForm"),
+  categoryName: document.getElementById("adminCategoryName"),
+  categorySlug: document.getElementById("adminCategorySlug"),
+  categoryParent: document.getElementById("adminCategoryParent"),
+  categorySort: document.getElementById("adminCategorySort"),
+  categoryActive: document.getElementById("adminCategoryActive"),
+  categoryStatus: document.getElementById("adminCategoryStatus"),
+  productModal: document.getElementById("adminProductModal"),
+  productForm: document.getElementById("adminProductForm"),
+  productName: document.getElementById("adminProductName"),
+  productSlug: document.getElementById("adminProductSlug"),
+  productCategory: document.getElementById("adminProductCategory"),
+  productBrand: document.getElementById("adminProductBrand"),
+  productSku: document.getElementById("adminProductSku"),
+  productPrice: document.getElementById("adminProductPrice"),
+  productSalePrice: document.getElementById("adminProductSalePrice"),
+  productStock: document.getElementById("adminProductStock"),
+  productImage: document.getElementById("adminProductImage"),
+  productShortDescription: document.getElementById("adminProductShortDescription"),
+  productDescription: document.getElementById("adminProductDescription"),
+  productFeatured: document.getElementById("adminProductFeatured"),
+  productActive: document.getElementById("adminProductActive"),
+  productStatus: document.getElementById("adminProductStatus"),
+  productImageFile: document.getElementById("adminProductImageFile"),
+  productImageCategory: document.getElementById("adminProductImageCategory"),
+  productImageFolder: document.getElementById("adminProductImageFolder"),
+
+  orderModal: document.getElementById("adminOrderModal"),
+  orderForm: document.getElementById("adminOrderForm"),
+  orderCode: document.getElementById("adminOrderCode"),
+  orderCustomer: document.getElementById("adminOrderCustomer"),
+  orderPhone: document.getElementById("adminOrderPhone"),
+  orderAddress: document.getElementById("adminOrderAddress"),
+  orderNote: document.getElementById("adminOrderNote"),
+  orderProducts: document.getElementById("adminOrderProducts"),
+  orderTotal: document.getElementById("adminOrderTotal"),
+  orderStatus: document.getElementById("adminOrderStatus"),
+  orderPaymentStatus: document.getElementById("adminOrderPaymentStatus"),
+  orderPaymentMethod: document.getElementById("adminOrderPaymentMethod"),
+  orderStatusText: document.getElementById("adminOrderStatusText"),
+
+  userModal: document.getElementById("adminUserModal"),
+  userForm: document.getElementById("adminUserForm"),
+  userName: document.getElementById("adminUserName"),
+  userEmail: document.getElementById("adminUserEmail"),
+  userRole: document.getElementById("adminUserRole"),
+  userPhone: document.getElementById("adminUserPhone"),
+  userStatus: document.getElementById("adminUserStatus"),
 };
 
 const state = {
   token: localStorage.getItem("authToken") || sessionStorage.getItem("authToken") || "",
-  user: null,
   products: [],
-  users: [],
+  categories: [],
+  inventory: [],
   orders: [],
+  users: [],
+  coupons: [],
+  banners: [],
+  reviews: [],
+  warranties: [],
   filteredProducts: [],
-  dashboard: null,
+  editingCategoryId: null,
+  editingProductId: null,
+  editingOrderId: null,
+  editingUserId: null,
 };
 
-function getAuthToken() {
+function getToken() {
   return localStorage.getItem("authToken") || sessionStorage.getItem("authToken") || state.token || "";
+}
+
+async function apiFetch(path, options = {}) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+      ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+    },
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.message || `Request failed (${response.status})`);
+  return payload;
+}
+
+function formatMoney(value) {
+  return Number(value || 0).toLocaleString("vi-VN") + "₫";
+}
+
+function labelCategory(category) {
+  return {
+    "gaming-laptop": "Gaming Laptop",
+    "office-laptop": "Office Laptop",
+    "gaming-pc": "Gaming PC",
+    accessory: "Accessory",
+  }[category] || category || "---";
+}
+
+function fixText(text) {
+  if (typeof text !== "string") return text || "";
+  return text.normalize("NFC");
 }
 
 function openModal(modal) {
@@ -84,7 +175,7 @@ function openModal(modal) {
   modal.classList.add("is-open");
   modal.setAttribute("aria-hidden", "false");
   document.body.classList.add("is-locked");
-  if (elements.globalBackdrop) elements.globalBackdrop.hidden = false;
+  if (els.globalBackdrop) els.globalBackdrop.hidden = false;
 }
 
 function closeModal(modal) {
@@ -92,165 +183,114 @@ function closeModal(modal) {
   modal.classList.remove("is-open");
   modal.setAttribute("aria-hidden", "true");
   document.body.classList.remove("is-locked");
-  if (elements.globalBackdrop) elements.globalBackdrop.hidden = true;
+  if (els.globalBackdrop) els.globalBackdrop.hidden = true;
 }
 
-function setPanelVisibility(panelName) {
-  const panels = {
-    dashboard: elements.adminDashboardPanel,
-    products: elements.adminProductsPanel,
-    orders: elements.adminOrdersPanel,
-    users: elements.adminUsersPanel,
-    marketing: elements.adminMarketingPanel,
-    settings: elements.adminSettingsPanel,
-  };
-
-  Object.entries(panels).forEach(([name, panel]) => {
-    if (!panel) return;
-    panel.hidden = name !== panelName;
+function setPanel(name) {
+  Object.entries(els.panels).forEach(([key, panel]) => {
+    if (panel) panel.hidden = key !== name;
   });
-
-  elements.adminNavLinks.forEach((link) => {
-    link.classList.toggle("is-active", link.dataset.adminTab === panelName);
-  });
+  els.navLinks.forEach((link) => link.classList.toggle("is-active", link.dataset.adminTab === name));
 }
 
-function formatCurrency(value) {
-  const amount = Number(value || 0);
-  return amount.toLocaleString("vi-VN") + "₫";
+function renderEmpty(table, colspan, message) {
+  if (!table) return;
+  table.innerHTML = `<tr><td colspan="${colspan}" class="admin-table__empty">${message}</td></tr>`;
 }
 
-function categoryLabel(category) {
-  const map = {
-    "gaming-laptop": "Gaming Laptop",
-    "office-laptop": "Office Laptop",
-    "gaming-pc": "Gaming PC",
-    accessory: "Accessory",
-  };
+function normalizeProduct(item) {
+  const gallery = LOCAL_GALLERIES[item.id] || [];
+  const local = LOCAL_PRODUCTS.find((product) => String(product.id) === String(item.id) || product.slug === item.slug);
 
-  return map[category] || category || "---";
-}
-
-function normalizeProduct(product) {
-  const gallery = localProductGalleries[product.id] || [];
   return {
-    ...product,
-    image: product.image || gallery[0] || "",
-    stock: product.stock ?? 0,
-    is_active: product.is_active !== false,
+    ...item,
+    name: item.name || local?.name || "",
+    category: item.category || local?.category || "",
+    image: item.image || gallery[0] || local?.image || "",
+    is_active: item.is_active !== false,
   };
 }
 
-function getFolderOptionsForCategory(category) {
-  return localProducts
-    .filter((product) => product.category === category)
-    .map((product) => product.id)
-    .filter(Boolean);
+function topCategory(products) {
+  const counts = products.reduce((acc, product) => {
+    acc[product.category] = (acc[product.category] || 0) + 1;
+    return acc;
+  }, {});
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
 }
 
-function ensureFolderSelect() {
-  if (!elements.adminProductImageFolder) return null;
-
-  if (elements.adminProductImageFolder.tagName === "SELECT") {
-    return elements.adminProductImageFolder;
-  }
-
-  const select = document.createElement("select");
-  select.id = "adminProductImageFolder";
-  select.className = elements.adminProductImageFolder.className;
-  elements.adminProductImageFolder.replaceWith(select);
-  elements.adminProductImageFolder = select;
-  return select;
-}
-
-function populateFolderSelect(category, defaultFolder = "") {
-  const select = ensureFolderSelect();
-  if (!select) return;
-
-  const folders = getFolderOptionsForCategory(category);
-  const uniqueFolders = [...new Set(folders)];
-
-  select.innerHTML = `
-    <option value="">-- Chọn thư mục con --</option>
-    ${uniqueFolders.map((folder) => `<option value="${folder}">${folder}</option>`).join("")}
-  `;
-
-  if (defaultFolder && uniqueFolders.includes(defaultFolder)) {
-    select.value = defaultFolder;
-  } else if (uniqueFolders.length) {
-    select.value = uniqueFolders[0];
-  }
-}
-
-async function apiFetch(path, options = {}) {
-  const token = getAuthToken();
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
-
-  let data = null;
-  try {
-    data = await response.json();
-  } catch (error) {
-    data = null;
-  }
-
-  if (!response.ok) {
-    throw new Error(data?.message || "Request failed");
-  }
-
-  return data;
-}
-
-async function verifyAdmin() {
-  const token = getAuthToken();
-  if (!token) {
-    window.location.href = "login.html";
-    return false;
-  }
-  state.token = token;
-
-  try {
-    const data = await apiFetch("/api/auth/me");
-    state.user = data.user;
-
-    if (!state.user || state.user.role !== "admin") {
-      elements.adminSystemStatus.textContent = "Không có quyền truy cập";
-      window.location.href = "index.html";
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    localStorage.removeItem("authToken");
-    sessionStorage.removeItem("authToken");
-    window.location.href = "login.html";
-    return false;
-  }
-}
-
-function renderProductsTable() {
-  if (!elements.adminProductsTable) return;
-
-  const rows = state.filteredProducts.length ? state.filteredProducts : state.products;
-
-  if (!rows.length) {
-    elements.adminProductsTable.innerHTML = `
-      <tr>
-        <td colspan="6" class="admin-table__empty">Chưa có dữ liệu sản phẩm.</td>
-      </tr>
+function renderProductCategoryOptions() {
+  const categoryOptions = state.categories.length
+    ? state.categories.map((category) => `<option value="${category.slug}">${category.name}</option>`).join("")
+    : `
+      <option value="gaming-laptop">Gaming Laptop</option>
+      <option value="office-laptop">Office Laptop</option>
+      <option value="gaming-pc">Gaming PC</option>
+      <option value="accessory">Accessory</option>
     `;
-    return;
+
+  if (els.productCategory) {
+    els.productCategory.innerHTML = categoryOptions;
   }
 
-  elements.adminProductsTable.innerHTML = rows
-    .map(
-      (product) => `
+  if (els.productCategoryFilter) {
+    const currentFilter = els.productCategoryFilter.value || "all";
+    const filterOptions = state.categories.length
+      ? state.categories.map((category) => `<option value="${category.slug}">${category.name}</option>`).join("")
+      : `
+        <option value="gaming-laptop">Gaming Laptop</option>
+        <option value="office-laptop">Office Laptop</option>
+        <option value="gaming-pc">Gaming PC</option>
+        <option value="accessory">Accessory</option>
+      `;
+    els.productCategoryFilter.innerHTML = `<option value="all">Tất cả danh mục</option>${filterOptions}`;
+    els.productCategoryFilter.value = currentFilter;
+  }
+}
+
+function renderAll() {
+  renderProductCategoryOptions();
+
+  const products = state.filteredProducts.length ? state.filteredProducts : state.products;
+  const categoryCounts = state.products.reduce((acc, product) => {
+    acc[product.category] = (acc[product.category] || 0) + 1;
+    return acc;
+  }, {});
+
+  if (els.statProducts) els.statProducts.textContent = String(state.products.length);
+  if (els.statOrders) els.statOrders.textContent = String(state.orders.length);
+  if (els.statUsers) els.statUsers.textContent = String(state.users.length);
+  if (els.statCoupons) els.statCoupons.textContent = String(state.coupons.length);
+  if (els.statTopCategory) els.statTopCategory.textContent = labelCategory(topCategory(state.products));
+  if (els.statActiveProducts) els.statActiveProducts.textContent = String(state.products.filter((p) => p.is_active !== false).length);
+  if (els.statPendingOrders) els.statPendingOrders.textContent = String(state.orders.filter((o) => o.status === "pending").length);
+  if (els.statActiveBanners) els.statActiveBanners.textContent = String(state.banners.filter((b) => b.is_active !== false).length);
+
+  if (els.countGamingLaptop) els.countGamingLaptop.textContent = `${categoryCounts["gaming-laptop"] || 0} sản phẩm`;
+  if (els.countOfficeLaptop) els.countOfficeLaptop.textContent = `${categoryCounts["office-laptop"] || 0} sản phẩm`;
+  if (els.countGamingPc) els.countGamingPc.textContent = `${categoryCounts["gaming-pc"] || 0} sản phẩm`;
+  if (els.countAccessory) els.countAccessory.textContent = `${categoryCounts["accessory"] || 0} sản phẩm`;
+
+  if (els.dashboardProductsTable) {
+    if (!state.products.length) {
+      renderEmpty(els.dashboardProductsTable, 4, "Chưa có dữ liệu.");
+    } else {
+      els.dashboardProductsTable.innerHTML = state.products.slice(0, 5).map((product) => `
+        <tr>
+          <td>${product.name}</td>
+          <td>${labelCategory(product.category)}</td>
+          <td>${formatMoney(product.price)}</td>
+          <td>${product.stock || 0}</td>
+        </tr>
+      `).join("");
+    }
+  }
+
+  if (els.productsTable) {
+    if (!products.length) {
+      renderEmpty(els.productsTable, 9, "Không tìm thấy sản phẩm.");
+    } else {
+      els.productsTable.innerHTML = products.map((product) => `
         <tr>
           <td>
             <div class="admin-table__product">
@@ -258,588 +298,478 @@ function renderProductsTable() {
               <strong>${product.name || "---"}</strong>
             </div>
           </td>
-          <td>${categoryLabel(product.category)}</td>
-          <td>${formatCurrency(product.price)}</td>
-          <td>${typeof product.stock === "number" ? product.stock : product.stock || 0}</td>
+          <td>${product.sku || "---"}</td>
+          <td>${labelCategory(product.category)}</td>
+          <td>${formatMoney(product.price)}</td>
+          <td>${product.sale_price ? formatMoney(product.sale_price) : "---"}</td>
+          <td>${product.stock || 0}</td>
+          <td>${product.is_featured ? "Yes" : "No"}</td>
+          <td>${product.is_active ? "Active" : "Hidden"}</td>
           <td>
-            <span class="admin-badge ${product.is_active === false ? "is-off" : "is-on"}">
-              ${product.is_active === false ? "Hidden" : "Active"}
-            </span>
-          </td>
-          <td>
-            <button type="button" class="btn btn--light" data-admin-action="edit-product" data-id="${product.id}">
-              Sửa
-            </button>
-            <button type="button" class="btn btn--light" data-admin-action="delete-product" data-id="${product.id}">
-              Xoá
-            </button>
+            <button type="button" class="btn btn--light" data-action="edit-product" data-id="${product.id}">Sửa</button>
+            <button type="button" class="btn btn--light" data-action="delete-product" data-id="${product.id}">Xoá</button>
           </td>
         </tr>
-      `
-    )
-    .join("");
-}
+      `).join("");
+    }
+  }
 
-function renderUsersTable() {
-  if (!elements.adminUsersTable) return;
-
-  const rows = state.users;
-
-  if (!rows.length) {
-    elements.adminUsersTable.innerHTML = `
+  if (els.categoriesTable) {
+    if (!state.categories.length) renderEmpty(els.categoriesTable, 6, "Chưa có dữ liệu.");
+    else els.categoriesTable.innerHTML = state.categories.map((category) => `
       <tr>
-        <td colspan="5" class="admin-table__empty">Chưa có dữ liệu người dùng.</td>
+        <td>${category.name}</td>
+        <td>${category.slug}</td>
+        <td>${category.parent_id || "---"}</td>
+        <td>${category.sort_order || 0}</td>
+        <td>${category.is_active ? "Active" : "Hidden"}</td>
+        <td>
+          <button type="button" class="btn btn--light" data-action="edit-category" data-id="${category.id}">Sửa</button>
+          <button type="button" class="btn btn--light" data-action="delete-category" data-id="${category.id}">Xoá</button>
+        </td>
       </tr>
-    `;
-    return;
+    `).join("");
   }
 
-  elements.adminUsersTable.innerHTML = rows
-    .map(
-      (user) => `
-        <tr>
-          <td>${user.name || "---"}</td>
-          <td>${user.email || "---"}</td>
-          <td>${user.role || "user"}</td>
-          <td>${user.phone || "---"}</td>
-          <td>
-            <button type="button" class="btn btn--light" data-admin-action="edit-user" data-id="${user.id}">
-              Sửa
-            </button>
-          </td>
-        </tr>
-      `
-    )
-    .join("");
-}
+  if (els.inventoryTable) {
+    if (!state.inventory.length) renderEmpty(els.inventoryTable, 4, "Chưa có dữ liệu.");
+    else els.inventoryTable.innerHTML = state.inventory.map((row) => `
+      <tr><td>${row.product_name || row.product_id}</td><td>${row.warehouse_location || "---"}</td><td>${row.quantity || 0}</td><td>${row.reserved_quantity || 0}</td></tr>
+    `).join("");
+  }
 
-function renderOrdersTable() {
-  const table = document.getElementById("adminOrdersTable");
-  if (!table) return;
-
-  const search = (elements.orderSearch?.value || "").trim().toLowerCase();
-  const rows = state.orders.filter((order) => !search || String(order.code || "").toLowerCase().includes(search));
-
-  if (!rows.length) {
-    table.innerHTML = `
+  if (els.ordersTable) {
+    const search = (els.orderSearch?.value || "").trim().toLowerCase();
+    const rows = state.orders.filter((order) => `${order.code || ""} ${order.customer_name || ""} ${order.customer_phone || ""}`.toLowerCase().includes(search));
+    if (!rows.length) renderEmpty(els.ordersTable, 8, "Không tìm thấy đơn hàng.");
+    else els.ordersTable.innerHTML = rows.map((order) => `
       <tr>
-        <td colspan="7" class="admin-table__empty">Không tìm thấy đơn hàng phù hợp.</td>
+        <td>${order.code || "---"}</td>
+        <td>${order.customer_name || "---"}</td>
+        <td>${order.customer_phone || "---"}</td>
+        <td>${formatMoney(order.total)}</td>
+        <td>${order.status || "---"}</td>
+        <td>${order.payment_status || "---"}</td>
+        <td>${order.created_at || "---"}</td>
+        <td><button type="button" class="btn btn--light" data-action="edit-order" data-id="${order.id}">Sửa</button></td>
       </tr>
-    `;
-    return;
+    `).join("");
   }
 
-  const statusLabel = {
-    pending: "Chờ xác nhận",
-    shipping: "Đang giao",
-    completed: "Hoàn thành",
-    cancelled: "Đã huỷ",
-  };
+  if (els.usersTable) {
+    if (!state.users.length) renderEmpty(els.usersTable, 6, "Chưa có dữ liệu.");
+    else els.usersTable.innerHTML = state.users.map((user) => `
+      <tr>
+        <td>${user.name || "---"}</td>
+        <td>${user.email || "---"}</td>
+        <td>${user.role || "user"}</td>
+        <td>${user.phone || "---"}</td>
+        <td>${user.is_active === false ? "Hidden" : "Active"}</td>
+        <td><button type="button" class="btn btn--light" data-action="edit-user" data-id="${user.id}">Sửa</button></td>
+      </tr>
+    `).join("");
+  }
 
-  table.innerHTML = rows
-    .map(
-      (order) => `
-        <tr>
-          <td>${order.code || "---"}</td>
-          <td>${order.customer || "---"}</td>
-          <td>${order.products || "---"}</td>
-          <td>${formatCurrency(order.total)}</td>
-          <td>${statusLabel[order.status] || order.status || "---"}</td>
-          <td>${order.created_at || order.createdAt || "---"}</td>
-          <td>
-            <button type="button" class="btn btn--light" data-admin-action="edit-order" data-id="${order.id}">
-              Sửa
-            </button>
-          </td>
-        </tr>
-      `
-    )
-    .join("");
-}
+  if (els.couponsTable) {
+    if (!state.coupons.length) renderEmpty(els.couponsTable, 7, "Chưa có dữ liệu.");
+    else els.couponsTable.innerHTML = state.coupons.map((coupon) => `
+      <tr><td>${coupon.code || "---"}</td><td>${coupon.name || "---"}</td><td>${coupon.discount_type || "---"}</td><td>${coupon.discount_value || 0}</td><td>${coupon.usage_limit || "---"}</td><td>${coupon.used_count || 0}</td><td>${coupon.is_active ? "Active" : "Hidden"}</td></tr>
+    `).join("");
+  }
 
-function renderOrderProductOptions(selectedValue = "") {
-  if (!elements.adminOrderProducts) return;
+  if (els.bannersTable) {
+    if (!state.banners.length) renderEmpty(els.bannersTable, 5, "Chưa có dữ liệu.");
+    else els.bannersTable.innerHTML = state.banners.map((banner) => `
+      <tr><td>${banner.title || "---"}</td><td>${banner.position || "---"}</td><td>${banner.sort_order || 0}</td><td>${banner.is_active ? "Active" : "Hidden"}</td><td>${banner.link_url || "---"}</td></tr>
+    `).join("");
+  }
 
-  const options = state.products
-    .map(
-      (product) => `<option value="${product.name}">${product.name} (${categoryLabel(product.category)})</option>`
-    )
-    .join("");
+  if (els.reviewsTable) {
+    if (!state.reviews.length) renderEmpty(els.reviewsTable, 5, "Chưa có dữ liệu.");
+    else els.reviewsTable.innerHTML = state.reviews.map((review) => `
+      <tr><td>${review.user_id || "---"}</td><td>${review.product_id || "---"}</td><td>${review.rating || 0}</td><td>${review.is_visible ? "Yes" : "No"}</td><td>${review.comment || "---"}</td></tr>
+    `).join("");
+  }
 
-  elements.adminOrderProducts.innerHTML = `
-    <option value="">-- Chọn sản phẩm từ MySQL --</option>
-    ${options}
-  `;
-
-  if (selectedValue) {
-    elements.adminOrderProducts.value = selectedValue;
+  if (els.warrantiesTable) {
+    if (!state.warranties.length) renderEmpty(els.warrantiesTable, 5, "Chưa có dữ liệu.");
+    else els.warrantiesTable.innerHTML = state.warranties.map((row) => `
+      <tr><td>${row.warranty_code || "---"}</td><td>${row.order_item_id || "---"}</td><td>${row.start_date || "---"}</td><td>${row.end_date || "---"}</td><td>${row.status || "---"}</td></tr>
+    `).join("");
   }
 }
 
-function updateSummary() {
-  const totalProducts = state.products.length;
-  const activeProducts = state.products.filter((product) => product.is_active !== false).length;
-  const totalUsers = state.users.length;
+function fillCategoryForm(category = null) {
+  state.editingCategoryId = category?.id || null;
+  els.categoryForm?.reset();
 
-  if (elements.adminTotalProducts) elements.adminTotalProducts.textContent = String(totalProducts);
-  if (elements.adminActiveProducts) elements.adminActiveProducts.textContent = String(activeProducts);
-  if (elements.adminTotalUsers) elements.adminTotalUsers.textContent = String(totalUsers);
-  if (elements.adminTotalOrders) elements.adminTotalOrders.textContent = String(state.orders.length);
+  els.categoryName.value = category?.name || "";
+  els.categorySlug.value = category?.slug || "";
+  els.categoryParent.value = category?.parent_id || "";
+  els.categorySort.value = category?.sort_order ?? 0;
+  els.categoryActive.checked = category?.is_active !== false;
+  els.categoryStatus.textContent = category ? "Đang chỉnh sửa danh mục." : "";
 
-  if (elements.adminRecentProductName) {
-    const recent = state.products[0];
-    elements.adminRecentProductName.textContent = recent?.name || "Chưa có dữ liệu";
-  }
-
-  if (elements.adminRecentOrderName) {
-    const recentOrder = state.orders[0];
-    elements.adminRecentOrderName.textContent = recentOrder?.code || "Chưa có dữ liệu";
-  }
-
-  if (elements.adminTopCategory) {
-    const counts = state.products.reduce((acc, product) => {
-      const key = product.category || "unknown";
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-
-    const topCategory = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
-    elements.adminTopCategory.textContent = topCategory ? categoryLabel(topCategory[0]) : "---";
-  }
+  openModal(els.categoryModal);
 }
 
-function filterProducts() {
-  const search = (elements.productSearch?.value || "").trim().toLowerCase();
-  const category = elements.productCategoryFilter?.value || "all";
-
+function applyProductFilter() {
+  const search = (els.productSearch?.value || "").trim().toLowerCase();
+  const category = els.productCategoryFilter?.value || "all";
   state.filteredProducts = state.products.filter((product) => {
-    const matchSearch = !search || (product.name || "").toLowerCase().includes(search);
+    const matchSearch = !search || `${product.name || ""} ${product.sku || ""} ${product.brand || ""}`.toLowerCase().includes(search);
     const matchCategory = category === "all" || product.category === category;
     return matchSearch && matchCategory;
   });
-
-  renderProductsTable();
+  renderAll();
 }
 
-async function loadDashboardData() {
-  if (elements.adminSystemStatus) {
-    elements.adminSystemStatus.textContent = "Đang tải dữ liệu...";
+async function loadData() {
+  const token = getToken();
+  if (!token) {
+    state.products = [];
+    state.users = [];
+    state.orders = [];
+    state.categories = [...DEFAULT_CATEGORIES];
+    state.inventory = [];
+    state.coupons = [];
+    state.banners = [];
+    state.reviews = [];
+    state.warranties = [];
+    state.filteredProducts = [];
+    renderAll();
+    return;
   }
 
-  try {
-    let products = [];
-    try {
-      const productsResponse = await apiFetch("/api/admin/products");
-      products = Array.isArray(productsResponse.products) ? productsResponse.products.map(normalizeProduct) : [];
-    } catch (error) {
-      products = localProducts.map(normalizeProduct);
-    }
+  const [dashboard, products, users, orders, categories, inventory, coupons, banners, reviews, warranties] = await Promise.all([
+    apiFetch("/api/admin/dashboard"),
+    apiFetch("/api/admin/products"),
+    apiFetch("/api/admin/users"),
+    apiFetch("/api/admin/orders"),
+    apiFetch("/api/admin/categories").catch(() => ({ categories: [] })),
+    apiFetch("/api/admin/inventory").catch(() => ({ inventory: [] })),
+    apiFetch("/api/admin/coupons").catch(() => ({ coupons: [] })),
+    apiFetch("/api/admin/banners").catch(() => ({ banners: [] })),
+    apiFetch("/api/admin/reviews").catch(() => ({ reviews: [] })),
+    apiFetch("/api/admin/warranties").catch(() => ({ warranties: [] })),
+  ]);
 
-    state.products = products;
+  state.products = (products.products || []).map(normalizeProduct);
+  state.users = users.users || [];
+  state.orders = orders.orders || [];
+  state.categories = (categories.categories || []).length ? categories.categories : [...DEFAULT_CATEGORIES];
+  state.inventory = inventory.inventory || [];
+  state.coupons = coupons.coupons || [];
+  state.banners = banners.banners || [];
+  state.reviews = reviews.reviews || [];
+  state.warranties = warranties.warranties || [];
+  state.filteredProducts = [...state.products];
 
-    let users = [];
-    try {
-      const usersResponse = await apiFetch("/api/admin/users");
-      users = Array.isArray(usersResponse.users) ? usersResponse.users : [];
-    } catch (error) {
-      users = state.user ? [state.user] : [];
-    }
-
-    state.users = users;
-    let orders = [];
-    try {
-      const ordersResponse = await apiFetch("/api/admin/orders");
-      orders = Array.isArray(ordersResponse.orders) ? ordersResponse.orders : [];
-    } catch (error) {
-      orders = [];
-    }
-
-    state.orders = orders;
-
-    state.filteredProducts = [...state.products];
-
-    renderProductsTable();
-    renderOrderProductOptions();
-    renderOrdersTable();
-    renderUsersTable();
-    updateSummary();
-
-    const categoryCounts = state.products.reduce((acc, product) => {
-      const key = product.category || "unknown";
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-
-    const topCategory = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0];
-
-    if (elements.adminCategoryGamingLaptop) {
-      elements.adminCategoryGamingLaptop.textContent = `${categoryCounts["gaming-laptop"] || 0} sản phẩm`;
-    }
-    if (elements.adminCategoryOfficeLaptop) {
-      elements.adminCategoryOfficeLaptop.textContent = `${categoryCounts["office-laptop"] || 0} sản phẩm`;
-    }
-    if (elements.adminCategoryGamingPc) {
-      elements.adminCategoryGamingPc.textContent = `${categoryCounts["gaming-pc"] || 0} sản phẩm`;
-    }
-    if (elements.adminCategoryAccessory) {
-      elements.adminCategoryAccessory.textContent = `${categoryCounts["accessory"] || 0} sản phẩm`;
-    }
-
-    if (elements.adminTotalProducts) {
-      elements.adminTotalProducts.textContent = String(state.products.length);
-    }
-    if (elements.adminActiveProducts) {
-      elements.adminActiveProducts.textContent = String(state.products.filter((product) => product.is_active).length);
-    }
-    if (elements.adminTotalUsers) {
-      elements.adminTotalUsers.textContent = String(state.users.length);
-    }
-    if (elements.adminTotalOrders) {
-      elements.adminTotalOrders.textContent = String(state.orders.length);
-    }
-    if (elements.adminRecentProductName) {
-      elements.adminRecentProductName.textContent = state.products[0]?.name || "Chưa có dữ liệu";
-    }
-    if (elements.adminRecentOrderName) {
-      elements.adminRecentOrderName.textContent = state.orders[0]?.code || "Chưa có dữ liệu";
-    }
-    if (elements.adminTopCategory) {
-      elements.adminTopCategory.textContent = topCategory ? categoryLabel(topCategory[0]) : "---";
-    }
-    if (elements.adminSystemStatus) {
-      elements.adminSystemStatus.textContent = "Đang hoạt động";
-    }
-
-    if (elements.adminDashboardProductsTable) {
-      elements.adminDashboardProductsTable.innerHTML = state.products
-        .slice(0, 4)
-        .map(
-          (product) => `
-            <tr>
-              <td>${product.name || "---"}</td>
-              <td>${categoryLabel(product.category)}</td>
-              <td>${formatCurrency(product.price)}</td>
-              <td>${typeof product.stock === "number" ? product.stock : product.stock || 0}</td>
-            </tr>
-          `
-        )
-        .join("");
-    }
-  } catch (error) {
-    if (elements.adminSystemStatus) {
-      elements.adminSystemStatus.textContent = error.message || "Không thể tải dữ liệu";
-    }
+  if (dashboard?.topCategory && els.statTopCategory) {
+    els.statTopCategory.textContent = labelCategory(dashboard.topCategory);
   }
+
+  renderAll();
 }
 
-let editingProductId = null;
-let editingOrderId = null;
-let editingUserId = null;
-
-function openOrderForm(order = null) {
-  editingOrderId = order ? order.id : null;
-
-  if (elements.adminOrderForm) {
-    elements.adminOrderForm.reset();
+async function verifyAdmin() {
+  const token = getToken();
+  if (!token) {
+    state.user = null;
+    return true;
   }
 
-  if (elements.adminOrderCode) elements.adminOrderCode.value = order?.code || "";
-  if (elements.adminOrderCustomer) elements.adminOrderCustomer.value = order?.customer || "";
-  if (elements.adminOrderProducts) {
-    renderOrderProductOptions(order?.products || "");
-  }
-  if (elements.adminOrderTotal) elements.adminOrderTotal.value = order?.total || 0;
-  if (elements.adminOrderStatus) elements.adminOrderStatus.value = order?.status || "pending";
-  if (elements.adminOrderStatusText) {
-    elements.adminOrderStatusText.textContent = order ? "Đang chỉnh sửa đơn hàng." : "";
+  const me = await apiFetch("/api/auth/me").catch(() => null);
+  if (!me?.user || me.user.role !== "admin") {
+    state.user = null;
+    return true;
   }
 
-  openModal(elements.adminOrderModal);
+  state.user = me.user;
+  return true;
 }
 
-function openUserForm(user = null) {
-  editingUserId = user ? user.id : null;
-
-  if (elements.adminUserForm) {
-    elements.adminUserForm.reset();
-  }
-
-  if (elements.adminUserName) elements.adminUserName.value = user?.name || "";
-  if (elements.adminUserEmail) elements.adminUserEmail.value = user?.email || "";
-  if (elements.adminUserRole) elements.adminUserRole.value = user?.role || "user";
-  if (elements.adminUserPhone) elements.adminUserPhone.value = user?.phone || "";
-  if (elements.adminUserStatus) {
-    elements.adminUserStatus.textContent = user ? "Đang chỉnh sửa tài khoản." : "";
-  }
-
-  openModal(elements.adminUserModal);
+function populateOrderProducts(selected = "") {
+  if (!els.orderProducts) return;
+  els.orderProducts.innerHTML = `<option value="">-- Chọn sản phẩm --</option>${state.products.map((product) => `<option value="${product.name}">${product.name} (${labelCategory(product.category)})</option>`).join("")}`;
+  if (selected) els.orderProducts.value = selected;
 }
 
-function openProductForm(product = null) {
-  editingProductId = product ? product.id : null;
+function fillProductForm(product = null) {
+  state.editingProductId = product?.id || null;
+  els.productForm?.reset();
 
-  if (elements.adminProductForm) {
-    elements.adminProductForm.reset();
-  }
+  els.productName.value = product?.name || "";
+  els.productSlug.value = product?.slug || "";
+  els.productCategory.value = product?.category || "gaming-laptop";
+  state.autoSlugFromName = product?.slug || "";
+  els.productBrand.value = product?.brand || "";
+  els.productSku.value = product?.sku || "";
+  els.productPrice.value = product?.price || 0;
+  els.productSalePrice.value = product?.sale_price || "";
+  els.productStock.value = product?.stock || 0;
+  els.productImage.value = product?.image || "";
+  els.productShortDescription.value = product?.short_description || "";
+  els.productDescription.value = product?.description || "";
+  els.productFeatured.checked = Boolean(product?.is_featured);
+  els.productActive.checked = product?.is_active !== false;
+  els.productStatus.textContent = product ? "Đang chỉnh sửa sản phẩm." : "";
 
-  if (elements.adminProductImageFile) {
-    elements.adminProductImageFile.value = "";
-  }
-  if (elements.adminProductImageCategory) {
-    elements.adminProductImageCategory.value = product?.category || "gaming-laptop";
-  }
-  populateFolderSelect(product?.category || elements.adminProductCategory?.value || "gaming-laptop", product?.name ? product.name.trim() : "");
+  openModal(els.productModal);
+}
 
-  if (product) {
-    elements.adminProductName.value = product.name || "";
-    elements.adminProductCategory.value = product.category || "gaming-laptop";
-    elements.adminProductPrice.value = product.price || 0;
-    elements.adminProductStock.value = product.stock || 0;
-    elements.adminProductImage.value = product.image || "";
-    if (elements.adminProductStatus) {
-      elements.adminProductStatus.textContent = "Đang chỉnh sửa sản phẩm.";
-    }
-  } else if (elements.adminProductStatus) {
-    elements.adminProductStatus.textContent = "";
-  }
+function fillOrderForm(order = null) {
+  state.editingOrderId = order?.id || null;
+  els.orderForm?.reset();
 
-  openModal(elements.adminProductModal);
+  els.orderCode.value = order?.code || "";
+  els.orderCustomer.value = order?.customer_name || "";
+  els.orderPhone.value = order?.customer_phone || "";
+  els.orderAddress.value = order?.shipping_address || "";
+  els.orderNote.value = order?.shipping_note || "";
+  populateOrderProducts(order?.products || "");
+  els.orderTotal.value = order?.total || 0;
+  els.orderStatus.value = order?.status || "pending";
+  els.orderPaymentStatus.value = order?.payment_status || "pending";
+  els.orderPaymentMethod.value = order?.payment_method || "cod";
+  els.orderStatusText.textContent = order ? "Đang chỉnh sửa đơn hàng." : "";
+
+  openModal(els.orderModal);
+}
+
+function fillUserForm(user = null) {
+  state.editingUserId = user?.id || null;
+  els.userForm?.reset();
+
+  els.userName.value = user?.name || "";
+  els.userEmail.value = user?.email || "";
+  els.userRole.value = user?.role || "user";
+  els.userPhone.value = user?.phone || "";
+  els.userStatus.textContent = user ? "Đang chỉnh sửa người dùng." : "";
+
+  openModal(els.userModal);
 }
 
 function bindEvents() {
-  elements.adminNavLinks.forEach((link) => {
-    link.addEventListener("click", (event) => {
-      event.preventDefault();
-      setPanelVisibility(link.dataset.adminTab);
-    });
-  });
+  els.navLinks.forEach((link) => link.addEventListener("click", (event) => {
+    event.preventDefault();
+    setPanel(link.dataset.adminTab);
+  }));
 
-  elements.refreshAdminData?.addEventListener("click", loadDashboardData);
-  elements.openAddProductForm?.addEventListener("click", () => openProductForm());
-  elements.openAddOrderForm?.addEventListener("click", () => {
-    renderOrderProductOptions("");
-    openOrderForm();
-  });
+  els.refreshAdminData?.addEventListener("click", loadData);
+  els.openAddProductForm?.addEventListener("click", () => fillProductForm());
+  els.openAddCategoryForm?.addEventListener("click", () => fillCategoryForm());
+  els.openAddOrderForm?.addEventListener("click", () => fillOrderForm());
 
-  elements.orderSearch?.addEventListener("input", renderOrdersTable);
-  elements.productSearch?.addEventListener("input", filterProducts);
-  elements.productCategoryFilter?.addEventListener("change", filterProducts);
-  elements.adminProductCategory?.addEventListener("change", () => {
-    populateFolderSelect(elements.adminProductCategory?.value || "gaming-laptop");
-  });
-
-  elements.adminOrderForm?.addEventListener("submit", async (event) => {
+  els.categoryForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const payload = {
-      code: elements.adminOrderCode?.value.trim() || "",
-      customer: elements.adminOrderCustomer?.value.trim() || "",
-      products: elements.adminOrderProducts?.value.trim() || "",
-      total: Number(elements.adminOrderTotal?.value || 0),
-      status: elements.adminOrderStatus?.value || "pending",
+      name: (els.categoryName?.value || "").trim(),
+      slug: (els.categorySlug?.value || "").trim(),
+      parent_id: els.categoryParent?.value === "" ? null : Number(els.categoryParent?.value || 0),
+      sort_order: Number(els.categorySort?.value || 0),
+      is_active: Boolean(els.categoryActive?.checked),
     };
 
-    try {
-      if (elements.adminOrderStatusText) {
-        elements.adminOrderStatusText.textContent = editingOrderId ? "Đang cập nhật đơn hàng..." : "Đang tạo đơn hàng...";
-      }
+    const method = state.editingCategoryId ? "PATCH" : "POST";
+    const url = state.editingCategoryId ? `/api/admin/categories/${state.editingCategoryId}` : "/api/admin/categories";
 
-      if (editingOrderId) {
-        await apiFetch(`/api/admin/orders/${editingOrderId}`, {
-          method: "PATCH",
-          body: JSON.stringify(payload),
-        });
-      } else {
-        await apiFetch("/api/admin/orders", {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
-      }
+    await apiFetch(url, { method, body: JSON.stringify(payload) });
+    if (els.categoryStatus) els.categoryStatus.textContent = "Đã lưu danh mục.";
+    closeModal(els.categoryModal);
+    await loadData();
+  });
+  els.productSearch?.addEventListener("input", applyProductFilter);
+  els.productCategoryFilter?.addEventListener("change", applyProductFilter);
+  els.orderSearch?.addEventListener("input", renderAll);
 
-      if (elements.adminOrderStatusText) {
-        elements.adminOrderStatusText.textContent = "Lưu đơn hàng thành công.";
-      }
+  els.productName?.addEventListener("input", () => {
+    if (!els.productSlug) return;
+    const currentSlug = (els.productSlug.value || "").trim();
+    const derivedSlug = fixText(els.productName.value || "").trim()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
 
-      closeModal(elements.adminOrderModal);
-      await loadDashboardData();
-    } catch (error) {
-      if (elements.adminOrderStatusText) {
-        elements.adminOrderStatusText.textContent = error.message || "Không thể lưu đơn hàng";
-      }
+    if (!currentSlug || currentSlug === state.autoSlugFromName) {
+      els.productSlug.value = derivedSlug;
+      state.autoSlugFromName = derivedSlug;
     }
-  });
-
-  elements.adminUserForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-
-    const payload = {
-      name: elements.adminUserName?.value.trim() || "",
-      email: elements.adminUserEmail?.value.trim() || "",
-      role: elements.adminUserRole?.value || "user",
-      phone: elements.adminUserPhone?.value.trim() || "",
-    };
-
-    try {
-      if (elements.adminUserStatus) {
-        elements.adminUserStatus.textContent = editingUserId ? "Đang cập nhật người dùng..." : "Đang tạo người dùng...";
-      }
-
-      await apiFetch(`/api/admin/users/${editingUserId}`, {
-        method: "PATCH",
-        body: JSON.stringify(payload),
-      });
-
-      if (elements.adminUserStatus) {
-        elements.adminUserStatus.textContent = "Lưu người dùng thành công.";
-      }
-
-      closeModal(elements.adminUserModal);
-      await loadDashboardData();
-    } catch (error) {
-      if (elements.adminUserStatus) {
-        elements.adminUserStatus.textContent = error.message || "Không thể lưu người dùng";
-      }
-    }
-  });
-
-  elements.adminProductForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-
-    const selectedFile = elements.adminProductImageFile?.files?.[0] || null;
-    const imageDataUrl = selectedFile
-      ? await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result || ""));
-          reader.onerror = () => reject(new Error("Không thể đọc file ảnh"));
-          reader.readAsDataURL(selectedFile);
-        })
-      : "";
-
-    const imageCategory = elements.adminProductImageCategory?.value || elements.adminProductCategory?.value || "accessory";
-    const imageFolder = elements.adminProductImageFolder?.value.trim() || elements.adminProductName?.value.trim() || "";
-
-    const payload = {
-      name: elements.adminProductName?.value.trim() || "",
-      category: elements.adminProductCategory?.value || "accessory",
-      price: Number(elements.adminProductPrice?.value || 0),
-      stock: Number(elements.adminProductStock?.value || 0),
-      image: elements.adminProductImage?.value.trim() || "",
-      imageCategory,
-      imageFolder,
-      imageDataUrl,
-      imageFileName: selectedFile?.name || "",
-    };
-
-    try {
-      if (elements.adminProductStatus) {
-        elements.adminProductStatus.textContent = editingProductId ? "Đang cập nhật sản phẩm..." : "Đang tạo sản phẩm...";
-      }
-
-      if (editingProductId) {
-        await apiFetch(`/api/admin/products/${editingProductId}`, {
-          method: "PATCH",
-          body: JSON.stringify(payload),
-        });
-      } else {
-        await apiFetch("/api/admin/products", {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
-      }
-
-      if (elements.adminProductStatus) {
-        elements.adminProductStatus.textContent = "Lưu sản phẩm thành công.";
-      }
-
-      closeModal(elements.adminProductModal);
-      await loadDashboardData();
-    } catch (error) {
-      if (elements.adminProductStatus) {
-        elements.adminProductStatus.textContent = error.message || "Không thể lưu sản phẩm";
-      }
-    }
-  });
-
-  document.querySelectorAll("[data-close-modal='adminProductModal']").forEach((button) => {
-    button.addEventListener("click", () => closeModal(elements.adminProductModal));
-  });
-
-  document.querySelectorAll("[data-close-modal='adminUserModal']").forEach((button) => {
-    button.addEventListener("click", () => closeModal(elements.adminUserModal));
-  });
-
-  document.querySelectorAll("[data-close-modal='adminOrderModal']").forEach((button) => {
-    button.addEventListener("click", () => closeModal(elements.adminOrderModal));
   });
 
   document.addEventListener("click", async (event) => {
-    const actionButton = event.target.closest("[data-admin-action]");
-    if (!actionButton) return;
+    const button = event.target.closest("[data-action]");
+    if (!button) return;
 
-    const action = actionButton.dataset.adminAction;
-    const id = actionButton.dataset.id;
+    const action = button.dataset.action;
+    const id = button.dataset.id;
 
     if (action === "edit-product") {
       const product = state.products.find((item) => String(item.id) === String(id));
-      if (!product) return;
-      openProductForm(product);
-      return;
+      if (product) fillProductForm(product);
+    }
+
+    if (action === "delete-product") {
+      if (!window.confirm("Xoá sản phẩm này?")) return;
+      await apiFetch(`/api/admin/products/${id}`, { method: "DELETE" });
+      await loadData();
+    }
+
+    if (action === "edit-category") {
+      const category = state.categories.find((item) => String(item.id) === String(id));
+      if (category) fillCategoryForm(category);
+    }
+
+    if (action === "delete-category") {
+      if (!window.confirm("Xoá danh mục này?")) return;
+      await apiFetch(`/api/admin/categories/${id}`, { method: "DELETE" });
+      await loadData();
     }
 
     if (action === "edit-order") {
       const order = state.orders.find((item) => String(item.id) === String(id));
-      if (!order) return;
-      openOrderForm(order);
-      return;
+      if (order) fillOrderForm(order);
     }
 
     if (action === "edit-user") {
       const user = state.users.find((item) => String(item.id) === String(id));
-      if (!user) return;
-      openUserForm(user);
-      return;
-    }
-
-    if (action === "delete-product") {
-      const confirmed = window.confirm("Xoá sản phẩm này?");
-      if (!confirmed) return;
-
-      try {
-        await apiFetch(`/api/admin/products/${id}`, { method: "DELETE" });
-        if (elements.adminProductStatus) {
-          elements.adminProductStatus.textContent = "Xoá sản phẩm thành công.";
-        }
-        await loadDashboardData();
-      } catch (error) {
-        if (elements.adminProductStatus) {
-          elements.adminProductStatus.textContent = error.message || "Không thể xoá sản phẩm";
-        }
-      }
-      return;
-    }
-
-    if (action === "toggle-user-role") {
-      if (elements.adminSystemStatus) {
-        elements.adminSystemStatus.textContent = "Chức năng đổi role sẽ được nối vào API ở bước tiếp theo.";
-      }
+      if (user) fillUserForm(user);
     }
   });
 
-  elements.globalBackdrop?.addEventListener("click", () => {
-    closeModal(elements.adminProductModal);
-    closeModal(elements.adminOrderModal);
-    closeModal(elements.adminUserModal);
+  document.querySelectorAll("[data-close-modal]").forEach((button) => {
+    button.addEventListener("click", () => closeModal(document.getElementById(button.dataset.closeModal)));
+  });
+
+  els.globalBackdrop?.addEventListener("click", () => {
+    closeModal(els.productModal);
+    closeModal(els.orderModal);
+    closeModal(els.userModal);
+  });
+
+  els.productCategory?.addEventListener("change", () => {
+    if (els.productImageCategory) els.productImageCategory.value = els.productCategory.value;
+  });
+
+  els.productImageFile?.addEventListener("change", () => {
+    const file = els.productImageFile.files?.[0];
+    if (file && els.productImage) els.productImage.placeholder = file.name;
+  });
+
+  els.categoryForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const payload = {
+      name: els.categoryName.value.trim(),
+      slug: els.categorySlug.value.trim(),
+      parent_id: els.categoryParent.value === "" ? null : Number(els.categoryParent.value),
+      sort_order: Number(els.categorySort.value || 0),
+      is_active: els.categoryActive.checked,
+    };
+
+    const method = state.editingCategoryId ? "PATCH" : "POST";
+    const url = state.editingCategoryId ? `/api/admin/categories/${state.editingCategoryId}` : "/api/admin/categories";
+    await apiFetch(url, { method, body: JSON.stringify(payload) });
+    closeModal(els.categoryModal);
+    await loadData();
+  });
+
+  els.productForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const file = els.productImageFile.files?.[0] || null;
+    const imageDataUrl = file ? await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(new Error("Không thể đọc file ảnh"));
+      reader.readAsDataURL(file);
+    }) : "";
+
+    const payload = {
+      name: els.productName.value.trim(),
+      slug: els.productSlug.value.trim() || fixText(els.productName.value.trim())
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, ""),
+      category: els.productCategory.value,
+      brand: els.productBrand.value.trim(),
+      sku: els.productSku.value.trim(),
+      price: Number(els.productPrice.value || 0),
+      sale_price: els.productSalePrice.value ? Number(els.productSalePrice.value) : null,
+      stock: Number(els.productStock.value || 0),
+      image: els.productImage.value.trim(),
+      short_description: els.productShortDescription.value.trim(),
+      description: els.productDescription.value.trim(),
+      is_featured: els.productFeatured.checked,
+      is_active: els.productActive.checked,
+      imageCategory: els.productImageCategory?.value || els.productCategory.value,
+      imageFolder: els.productImageFolder?.value?.trim() || "",
+      imageDataUrl,
+      imageFileName: file?.name || "",
+    };
+
+    const method = state.editingProductId ? "PATCH" : "POST";
+    const url = state.editingProductId ? `/api/admin/products/${state.editingProductId}` : "/api/admin/products";
+    await apiFetch(url, { method, body: JSON.stringify(payload) });
+    closeModal(els.productModal);
+    await loadData();
+  });
+
+  els.orderForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const payload = {
+      code: els.orderCode.value.trim(),
+      customer_name: els.orderCustomer.value.trim(),
+      customer_phone: els.orderPhone.value.trim(),
+      shipping_address: els.orderAddress.value.trim(),
+      shipping_note: els.orderNote.value.trim(),
+      products: els.orderProducts.value.trim(),
+      subtotal: Number(els.orderTotal.value || 0),
+      shipping_fee: 0,
+      discount_amount: 0,
+      total: Number(els.orderTotal.value || 0),
+      status: els.orderStatus.value,
+      payment_status: els.orderPaymentStatus.value,
+      payment_method: els.orderPaymentMethod.value,
+    };
+
+    const method = state.editingOrderId ? "PATCH" : "POST";
+    const url = state.editingOrderId ? `/api/admin/orders/${state.editingOrderId}` : "/api/admin/orders";
+    await apiFetch(url, { method, body: JSON.stringify(payload) });
+    closeModal(els.orderModal);
+    await loadData();
+  });
+
+  els.userForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!state.editingUserId) return;
+    const payload = {
+      name: els.userName.value.trim(),
+      email: els.userEmail.value.trim(),
+      role: els.userRole.value,
+      phone: els.userPhone.value.trim(),
+    };
+
+    await apiFetch(`/api/admin/users/${state.editingUserId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+    closeModal(els.userModal);
+    await loadData();
   });
 }
 
 async function init() {
-  setPanelVisibility("dashboard");
+  setPanel("dashboard");
   bindEvents();
-
-  const isAdmin = await verifyAdmin();
-  if (!isAdmin) return;
-
-  await loadDashboardData();
+  const allowed = await verifyAdmin();
+  if (!allowed) return;
+  await loadData();
 }
 
 init();

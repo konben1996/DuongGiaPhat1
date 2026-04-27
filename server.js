@@ -23,11 +23,20 @@ app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 app.use(express.static(__dirname));
 
+function sendRootHtml(req, res, fileName) {
+  const filePath = path.join(__dirname, fileName);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).send(`Không tìm thấy ${fileName}`);
+  }
+  return res.sendFile(filePath);
+}
+
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'duonggiaphat',
+  charset: 'utf8mb4',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
@@ -66,10 +75,17 @@ function loadLocalProducts() {
 function normalizeProductForDb(product) {
   return {
     name: product.name,
-    category: product.category,
+    slug: slugify(product.slug || product.name),
+    category_id: product.category_id || 4,
+    brand: product.brand || null,
+    sku: product.sku || null,
+    short_description: product.short_description || product.description || null,
+    description: product.description || null,
     price: Number(product.price) || 0,
+    sale_price: product.sale_price || null,
     stock: typeof product.stock === 'number' ? product.stock : 0,
     image: product.image || null,
+    is_featured: Number(Boolean(product.is_featured)),
     is_active: 1,
   };
 }
@@ -133,6 +149,56 @@ function mimeTypeToExtension(mimeType) {
   return map[mimeType.toLowerCase()] || ".png";
 }
 
+const CATEGORY_MAP = {
+  'gaming-laptop': 'gaming-laptop',
+  'office-laptop': 'office-laptop',
+  'gaming-pc': 'gaming-pc',
+  accessory: 'accessory',
+};
+
+function normalizeCategoryKey(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw) return 'accessory';
+  if (CATEGORY_MAP[raw]) return raw;
+  if (raw.includes('gaming') && raw.includes('laptop')) return 'gaming-laptop';
+  if (raw.includes('office') || raw.includes('văn phòng') || raw.includes('van phong')) return 'office-laptop';
+  if (raw.includes('pc') || raw.includes('desktop') || raw.includes('máy tính')) return 'gaming-pc';
+  return 'accessory';
+}
+
+function slugify(input) {
+  return String(input || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'item';
+}
+
+async function createUniqueProductSlug(name, productId = null) {
+  const baseSlug = slugify(name || 'san-pham-moi');
+  let nextSlug = baseSlug;
+  let suffix = 2;
+
+  while (true) {
+    const params = [nextSlug];
+    let query = 'SELECT id FROM products WHERE slug = ? LIMIT 1';
+    if (productId !== null) {
+      query = 'SELECT id FROM products WHERE slug = ? AND id <> ? LIMIT 1';
+      params.push(productId);
+    }
+
+    const result = await getDbOrFallbackRows(query, params);
+    if (!result.ok || result.rows.length === 0) {
+      return nextSlug;
+    }
+
+    nextSlug = `${baseSlug}-${suffix}`;
+    suffix += 1;
+  }
+}
+
 const seededAdminUser = {
   id: 999,
   email: 'admin@dgstore.local',
@@ -179,17 +245,11 @@ function authMiddleware(req, res, next) {
   }
 }
 
-app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/index.html');
-});
+app.get('/', (req, res) => sendRootHtml(req, res, 'index.html'));
 
-app.get('/login.html', (req, res) => {
-  res.sendFile(__dirname + '/login.html');
-});
+app.get('/login.html', (req, res) => sendRootHtml(req, res, 'login.html'));
 
-app.get('/register.html', (req, res) => {
-  res.sendFile(__dirname + '/register.html');
-});
+app.get('/register.html', (req, res) => sendRootHtml(req, res, 'register.html'));
 
 app.get('/api/health', async (req, res) => {
   const result = await getDbOrFallbackRows('SELECT 1 AS ok');
@@ -548,11 +608,26 @@ async function seedProductsIfNeeded() {
       return;
     }
 
-    const values = products
-      .map((product) => [product.name, product.category, product.price, product.stock, product.image, product.is_active]);
+    const categoryIds = await pool.query('SELECT id, slug FROM categories');
+    const categoryMap = Object.fromEntries((categoryIds[0] || []).map((row) => [row.slug, row.id]));
+    const values = products.map((product) => [
+      product.name,
+      product.slug,
+      categoryMap[normalizeCategoryKey(product.category)] || 4,
+      product.brand,
+      product.sku,
+      product.short_description,
+      product.description,
+      product.price,
+      product.sale_price,
+      product.stock,
+      product.image,
+      product.is_featured,
+      product.is_active,
+    ]);
 
     await pool.query(
-      'INSERT INTO products (name, category, price, stock, image, is_active) VALUES ?',
+      'INSERT INTO products (name, slug, category_id, brand, sku, short_description, description, price, sale_price, stock, image, is_featured, is_active) VALUES ?',
       [values]
     );
   } catch (error) {
@@ -562,7 +637,10 @@ async function seedProductsIfNeeded() {
 
 async function fetchAdminProducts() {
   const result = await getDbOrFallbackRows(
-    'SELECT id, name, category, price, stock, image, is_active, created_at, updated_at FROM products ORDER BY id DESC'
+    `SELECT p.id, p.name, c.slug AS category, c.name AS category_name, p.price, p.stock, p.image, p.is_active, p.created_at, p.updated_at
+     FROM products p
+     LEFT JOIN categories c ON c.id = p.category_id
+     ORDER BY p.id DESC`
   );
   if (result.ok) {
     return result.rows;
@@ -573,7 +651,7 @@ async function fetchAdminProducts() {
 
 async function fetchAdminUsers() {
   const result = await getDbOrFallbackRows(
-    'SELECT id, email, name, phone, role, created_at FROM users ORDER BY id DESC'
+    'SELECT id, email, name, phone, role, is_active, created_at, updated_at FROM users ORDER BY id DESC'
   );
   if (result.ok) {
     return result.rows;
@@ -586,6 +664,7 @@ async function fetchAdminUsers() {
       email: 'admin@dgstore.local',
       phone: '0900000000',
       role: 'admin',
+      is_active: 1,
     },
     {
       id: 2,
@@ -593,13 +672,166 @@ async function fetchAdminUsers() {
       email: 'user1@dgstore.local',
       phone: '0911111111',
       role: 'user',
+      is_active: 1,
     },
   ];
 }
 
+async function fetchAdminCategories() {
+  const result = await getDbOrFallbackRows(
+    'SELECT id, name, slug, parent_id, sort_order, is_active, created_at, updated_at FROM categories ORDER BY sort_order ASC, id ASC'
+  );
+  if (result.ok) return result.rows;
+  return [];
+}
+
+function normalizeCategoryPayload(body = {}) {
+  return {
+    name: typeof body.name === 'string' ? body.name.trim() : '',
+    slug: typeof body.slug === 'string' ? slugify(body.slug) : '',
+    parent_id: body.parent_id === undefined || body.parent_id === null || body.parent_id === '' ? null : Number(body.parent_id),
+    sort_order: body.sort_order === undefined || body.sort_order === null || body.sort_order === '' ? 0 : Number(body.sort_order),
+    is_active: body.is_active === undefined ? 1 : Number(Boolean(body.is_active)),
+  };
+}
+
+app.post('/api/admin/categories', authMiddleware, requireAdmin, async (req, res) => {
+  const payload = normalizeCategoryPayload(req.body || {});
+  if (!payload.name) {
+    return res.status(400).json({ message: 'Tên danh mục không được để trống' });
+  }
+
+  const baseSlug = payload.slug || slugify(payload.name);
+  const dbDuplicate = await getDbOrFallbackRows('SELECT id FROM categories WHERE slug = ? LIMIT 1', [baseSlug]);
+  if (dbDuplicate.ok && dbDuplicate.rows.length > 0) {
+    return res.status(409).json({ message: 'Slug danh mục đã tồn tại' });
+  }
+
+  if (dbDuplicate.ok) {
+    const slug = baseSlug;
+    const [result] = await pool.query(
+      'INSERT INTO categories (name, slug, parent_id, sort_order, is_active) VALUES (?, ?, ?, ?, ?)',
+      [payload.name, slug, payload.parent_id, payload.sort_order, payload.is_active]
+    );
+
+    const inserted = await pool.query(
+      'SELECT id, name, slug, parent_id, sort_order, is_active, created_at, updated_at FROM categories WHERE id = ? LIMIT 1',
+      [result.insertId]
+    );
+
+    return res.status(201).json({ message: 'Tạo danh mục thành công', category: inserted[0][0] });
+  }
+
+  return res.status(501).json({ message: 'Tạo danh mục chưa hỗ trợ ở chế độ fallback' });
+});
+
+app.patch('/api/admin/categories/:id', authMiddleware, requireAdmin, async (req, res) => {
+  const categoryId = Number(req.params.id);
+  if (!Number.isFinite(categoryId)) {
+    return res.status(400).json({ message: 'ID danh mục không hợp lệ' });
+  }
+
+  const current = await getDbOrFallbackRows('SELECT id, name, slug, parent_id, sort_order, is_active FROM categories WHERE id = ? LIMIT 1', [categoryId]);
+  if (!current.ok || current.rows.length === 0) {
+    return res.status(404).json({ message: 'Không tìm thấy danh mục' });
+  }
+
+  const payload = normalizeCategoryPayload(req.body || {});
+  const nextName = payload.name || current.rows[0].name;
+  const nextSlug = payload.slug || slugify(nextName);
+  const nextParentId = payload.parent_id === null ? null : payload.parent_id;
+  const nextSortOrder = payload.sort_order === undefined ? current.rows[0].sort_order : payload.sort_order;
+  const nextIsActive = payload.is_active === undefined ? current.rows[0].is_active : payload.is_active;
+
+  const duplicate = await getDbOrFallbackRows('SELECT id FROM categories WHERE slug = ? AND id <> ? LIMIT 1', [nextSlug, categoryId]);
+  if (duplicate.ok && duplicate.rows.length > 0) {
+    return res.status(409).json({ message: 'Slug danh mục đã tồn tại' });
+  }
+
+  await pool.query(
+    'UPDATE categories SET name = ?, slug = ?, parent_id = ?, sort_order = ?, is_active = ? WHERE id = ?',
+    [nextName, nextSlug, nextParentId, nextSortOrder, nextIsActive, categoryId]
+  );
+
+  const updated = await pool.query(
+    'SELECT id, name, slug, parent_id, sort_order, is_active, created_at, updated_at FROM categories WHERE id = ? LIMIT 1',
+    [categoryId]
+  );
+
+  return res.json({ message: 'Cập nhật danh mục thành công', category: updated[0][0] });
+});
+
+app.delete('/api/admin/categories/:id', authMiddleware, requireAdmin, async (req, res) => {
+  const categoryId = Number(req.params.id);
+  if (!Number.isFinite(categoryId)) {
+    return res.status(400).json({ message: 'ID danh mục không hợp lệ' });
+  }
+
+  const check = await getDbOrFallbackRows('SELECT id FROM categories WHERE id = ? LIMIT 1', [categoryId]);
+  if (!check.ok || check.rows.length === 0) {
+    return res.status(404).json({ message: 'Không tìm thấy danh mục' });
+  }
+
+  await pool.query('DELETE FROM categories WHERE id = ?', [categoryId]);
+  return res.json({ message: 'Xoá danh mục thành công' });
+});
+
+async function fetchAdminInventory() {
+  const result = await getDbOrFallbackRows(
+    `SELECT i.id, i.product_id, p.name AS product_name, i.quantity, i.reserved_quantity, i.warehouse_location, i.updated_at
+     FROM inventory i
+     LEFT JOIN products p ON p.id = i.product_id
+     ORDER BY i.id DESC`
+  );
+  if (result.ok) return result.rows;
+  return [];
+}
+
+async function fetchAdminCoupons() {
+  const result = await getDbOrFallbackRows(
+    'SELECT id, code, name, discount_type, discount_value, min_order_value, max_discount, start_at, end_at, usage_limit, used_count, is_active, created_at, updated_at FROM coupons ORDER BY id DESC'
+  );
+  if (result.ok) return result.rows;
+  return [];
+}
+
+async function fetchAdminBanners() {
+  const result = await getDbOrFallbackRows(
+    'SELECT id, title, image_url, link_url, position, sort_order, is_active, created_at, updated_at FROM banners ORDER BY sort_order ASC, id DESC'
+  );
+  if (result.ok) return result.rows;
+  return [];
+}
+
+async function fetchAdminReviews() {
+  const result = await getDbOrFallbackRows(
+    `SELECT r.id, r.user_id, u.name AS user_name, r.product_id, p.name AS product_name, r.rating, r.comment, r.is_visible, r.created_at, r.updated_at
+     FROM reviews r
+     LEFT JOIN users u ON u.id = r.user_id
+     LEFT JOIN products p ON p.id = r.product_id
+     ORDER BY r.id DESC`
+  );
+  if (result.ok) return result.rows;
+  return [];
+}
+
+async function fetchAdminWarranties() {
+  const result = await getDbOrFallbackRows(
+    `SELECT w.id, w.order_item_id, w.warranty_code, w.start_date, w.end_date, w.status, w.note, w.created_at, w.updated_at
+     FROM warranties w
+     ORDER BY w.id DESC`
+  );
+  if (result.ok) return result.rows;
+  return [];
+}
+
 async function fetchAdminOrders() {
   const result = await getDbOrFallbackRows(
-    'SELECT id, code, customer, products, total, status, created_at, updated_at FROM orders ORDER BY id DESC'
+    `SELECT o.id, o.code, o.customer_name AS customer_name, o.customer_phone, o.shipping_address, o.shipping_note,
+            o.subtotal, o.shipping_fee, o.discount_amount, o.total, o.status, o.payment_status, o.payment_method,
+            o.created_at, o.updated_at
+     FROM orders o
+     ORDER BY o.id DESC`
   );
   if (result.ok) {
     return result.rows;
@@ -610,14 +842,30 @@ async function fetchAdminOrders() {
 
 function normalizeOrderPayload(body = {}) {
   const code = typeof body.code === 'string' ? body.code.trim() : '';
-  const customer = typeof body.customer === 'string' ? body.customer.trim() : '';
+  const customer_name = typeof body.customer_name === 'string' ? body.customer_name.trim() : '';
+  const customer_phone = typeof body.customer_phone === 'string' ? body.customer_phone.trim() : '';
+  const shipping_address = typeof body.shipping_address === 'string' ? body.shipping_address.trim() : '';
+  const shipping_note = typeof body.shipping_note === 'string' ? body.shipping_note.trim() : '';
   const status = typeof body.status === 'string' ? body.status.trim() : 'pending';
+  const payment_status = typeof body.payment_status === 'string' ? body.payment_status.trim() : 'unpaid';
+  const payment_method = typeof body.payment_method === 'string' ? body.payment_method.trim() : 'cod';
+  const subtotal = Number(body.subtotal || 0);
+  const shipping_fee = Number(body.shipping_fee || 0);
+  const discount_amount = Number(body.discount_amount || 0);
   const total = Number(body.total || 0);
 
   return {
     code,
-    customer,
+    customer_name,
+    customer_phone,
+    shipping_address,
+    shipping_note,
     status,
+    payment_status,
+    payment_method,
+    subtotal: Number.isFinite(subtotal) ? subtotal : 0,
+    shipping_fee: Number.isFinite(shipping_fee) ? shipping_fee : 0,
+    discount_amount: Number.isFinite(discount_amount) ? discount_amount : 0,
     total: Number.isFinite(total) ? total : 0,
   };
 }
@@ -643,6 +891,16 @@ app.get('/api/admin/products', authMiddleware, requireAdmin, async (req, res) =>
   return res.json({ products });
 });
 
+app.get('/api/admin/categories', authMiddleware, requireAdmin, async (req, res) => {
+  const categories = await fetchAdminCategories();
+  return res.json({ categories });
+});
+
+app.get('/api/admin/inventory', authMiddleware, requireAdmin, async (req, res) => {
+  const inventory = await fetchAdminInventory();
+  return res.json({ inventory });
+});
+
 app.get('/api/admin/users', authMiddleware, requireAdmin, async (req, res) => {
   const users = await fetchAdminUsers();
   return res.json({ users });
@@ -653,27 +911,64 @@ app.get('/api/admin/orders', authMiddleware, requireAdmin, async (req, res) => {
   return res.json({ orders });
 });
 
-app.post('/api/admin/orders', authMiddleware, requireAdmin, async (req, res) => {
-  const { code, customer, status, total } = normalizeOrderPayload(req.body || {});
+app.get('/api/admin/coupons', authMiddleware, requireAdmin, async (req, res) => {
+  const coupons = await fetchAdminCoupons();
+  return res.json({ coupons });
+});
 
-  if (!code || !customer) {
-    return res.status(400).json({ message: 'Thiếu mã đơn hàng hoặc tên khách hàng' });
+app.get('/api/admin/banners', authMiddleware, requireAdmin, async (req, res) => {
+  const banners = await fetchAdminBanners();
+  return res.json({ banners });
+});
+
+app.get('/api/admin/reviews', authMiddleware, requireAdmin, async (req, res) => {
+  const reviews = await fetchAdminReviews();
+  return res.json({ reviews });
+});
+
+app.get('/api/admin/warranties', authMiddleware, requireAdmin, async (req, res) => {
+  const warranties = await fetchAdminWarranties();
+  return res.json({ warranties });
+});
+
+app.post('/api/admin/orders', authMiddleware, requireAdmin, async (req, res) => {
+  const payload = normalizeOrderPayload(req.body || {});
+
+  if (!payload.code || !payload.customer_name || !payload.customer_phone || !payload.shipping_address) {
+    return res.status(400).json({ message: 'Thiếu mã đơn hàng, tên khách hàng, số điện thoại hoặc địa chỉ giao hàng' });
   }
 
-  const products = typeof req.body.products === 'string' ? req.body.products.trim() : '';
-  const dbCheck = await getDbOrFallbackRows('SELECT id FROM orders WHERE code = ? LIMIT 1', [code]);
+  const dbCheck = await getDbOrFallbackRows('SELECT id FROM orders WHERE code = ? LIMIT 1', [payload.code]);
   if (dbCheck.ok && dbCheck.rows.length > 0) {
     return res.status(409).json({ message: 'Mã đơn hàng đã tồn tại' });
   }
 
   if (dbCheck.ok) {
     const [result] = await pool.query(
-      'INSERT INTO orders (code, customer, products, total, status) VALUES (?, ?, ?, ?, ?)',
-      [code, customer, products || null, total, status]
+      `INSERT INTO orders (
+        code, customer_name, customer_phone, shipping_address, shipping_note,
+        subtotal, shipping_fee, discount_amount, total, status, payment_status, payment_method
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        payload.code,
+        payload.customer_name,
+        payload.customer_phone,
+        payload.shipping_address,
+        payload.shipping_note || null,
+        payload.subtotal,
+        payload.shipping_fee,
+        payload.discount_amount,
+        payload.total,
+        payload.status,
+        payload.payment_status,
+        payload.payment_method,
+      ]
     );
 
     const inserted = await pool.query(
-      'SELECT id, code, customer, products, total, status, created_at, updated_at FROM orders WHERE id = ? LIMIT 1',
+      `SELECT id, code, customer_name, customer_phone, shipping_address, shipping_note, subtotal, shipping_fee,
+              discount_amount, total, status, payment_status, payment_method, created_at, updated_at
+       FROM orders WHERE id = ? LIMIT 1`,
       [result.insertId]
     );
 
@@ -685,11 +980,18 @@ app.post('/api/admin/orders', authMiddleware, requireAdmin, async (req, res) => 
 
   const fallbackOrder = {
     id: memoryOrders.length + 1,
-    code,
-    customer,
-    products: products || null,
-    total,
-    status,
+    code: payload.code,
+    customer_name: payload.customer_name,
+    customer_phone: payload.customer_phone,
+    shipping_address: payload.shipping_address,
+    shipping_note: payload.shipping_note || null,
+    subtotal: payload.subtotal,
+    shipping_fee: payload.shipping_fee,
+    discount_amount: payload.discount_amount,
+    total: payload.total,
+    status: payload.status,
+    payment_status: payload.payment_status,
+    payment_method: payload.payment_method,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -713,33 +1015,61 @@ app.patch('/api/admin/orders/:id', authMiddleware, requireAdmin, async (req, res
     return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
   }
 
-  const { code, customer, status, total } = normalizeOrderPayload(req.body || {});
-  const products = typeof req.body.products === 'string' ? req.body.products.trim() : '';
+  const payload = normalizeOrderPayload(req.body || {});
 
   if (dbCheck.ok) {
-    const current = await pool.query('SELECT id, code, customer, products, total, status FROM orders WHERE id = ? LIMIT 1', [orderId]);
+    const current = await pool.query(
+      'SELECT id, code, customer_name, customer_phone, shipping_address, shipping_note, subtotal, shipping_fee, discount_amount, total, status, payment_status, payment_method FROM orders WHERE id = ? LIMIT 1',
+      [orderId]
+    );
     const currentOrder = current[0][0];
 
-    const nextCode = code || currentOrder.code;
-    const nextCustomer = customer || currentOrder.customer;
-    const nextProducts = products !== '' ? products : currentOrder.products;
-    const nextStatus = status || currentOrder.status;
-    const nextTotal = Number.isFinite(total) && total !== 0 ? total : currentOrder.total;
+    const nextCode = payload.code || currentOrder.code;
+    const nextCustomerName = payload.customer_name || currentOrder.customer_name;
+    const nextCustomerPhone = payload.customer_phone || currentOrder.customer_phone;
+    const nextShippingAddress = payload.shipping_address || currentOrder.shipping_address;
+    const nextShippingNote = payload.shipping_note !== '' ? payload.shipping_note : currentOrder.shipping_note;
+    const nextSubtotal = payload.subtotal || currentOrder.subtotal;
+    const nextShippingFee = payload.shipping_fee || currentOrder.shipping_fee;
+    const nextDiscountAmount = payload.discount_amount || currentOrder.discount_amount;
+    const nextTotal = payload.total || currentOrder.total;
+    const nextStatus = payload.status || currentOrder.status;
+    const nextPaymentStatus = payload.payment_status || currentOrder.payment_status;
+    const nextPaymentMethod = payload.payment_method || currentOrder.payment_method;
 
-    if (code && code !== currentOrder.code) {
-      const duplicate = await getDbOrFallbackRows('SELECT id FROM orders WHERE code = ? AND id <> ? LIMIT 1', [code, orderId]);
+    if (payload.code && payload.code !== currentOrder.code) {
+      const duplicate = await getDbOrFallbackRows('SELECT id FROM orders WHERE code = ? AND id <> ? LIMIT 1', [payload.code, orderId]);
       if (duplicate.ok && duplicate.rows.length > 0) {
         return res.status(409).json({ message: 'Mã đơn hàng đã tồn tại' });
       }
     }
 
     await pool.query(
-      'UPDATE orders SET code = ?, customer = ?, products = ?, total = ?, status = ? WHERE id = ?',
-      [nextCode, nextCustomer, nextProducts, nextTotal, nextStatus, orderId]
+      `UPDATE orders
+       SET code = ?, customer_name = ?, customer_phone = ?, shipping_address = ?, shipping_note = ?,
+           subtotal = ?, shipping_fee = ?, discount_amount = ?, total = ?, status = ?, payment_status = ?, payment_method = ?
+       WHERE id = ?`,
+      [
+        nextCode,
+        nextCustomerName,
+        nextCustomerPhone,
+        nextShippingAddress,
+        nextShippingNote || null,
+        nextSubtotal,
+        nextShippingFee,
+        nextDiscountAmount,
+        nextTotal,
+        nextStatus,
+        nextPaymentStatus,
+        nextPaymentMethod,
+        orderId,
+      ]
     );
 
     const updated = await pool.query(
-      'SELECT id, code, customer, products, total, status, created_at, updated_at FROM orders WHERE id = ? LIMIT 1',
+      `SELECT id, code, customer_name, customer_phone, shipping_address, shipping_note, subtotal, shipping_fee,
+              discount_amount, total, status, payment_status, payment_method, created_at, updated_at
+       FROM orders WHERE id = ? LIMIT 1`,
       [orderId]
     );
 
@@ -757,11 +1087,18 @@ app.patch('/api/admin/orders/:id', authMiddleware, requireAdmin, async (req, res
   const currentOrder = memoryOrders[currentOrderIndex];
   const nextOrder = {
     ...currentOrder,
-    code: code || currentOrder.code,
-    customer: customer || currentOrder.customer,
-    products: products !== '' ? products : currentOrder.products,
-    total: Number.isFinite(total) && total !== 0 ? total : currentOrder.total,
-    status: status || currentOrder.status,
+    code: payload.code || currentOrder.code,
+    customer_name: payload.customer_name || currentOrder.customer_name,
+    customer_phone: payload.customer_phone || currentOrder.customer_phone,
+    shipping_address: payload.shipping_address || currentOrder.shipping_address,
+    shipping_note: payload.shipping_note !== '' ? payload.shipping_note : currentOrder.shipping_note,
+    subtotal: payload.subtotal || currentOrder.subtotal,
+    shipping_fee: payload.shipping_fee || currentOrder.shipping_fee,
+    discount_amount: payload.discount_amount || currentOrder.discount_amount,
+    total: payload.total || currentOrder.total,
+    status: payload.status || currentOrder.status,
+    payment_status: payload.payment_status || currentOrder.payment_status,
+    payment_method: payload.payment_method || currentOrder.payment_method,
     updated_at: new Date().toISOString(),
   };
 
@@ -833,7 +1170,7 @@ app.delete('/api/admin/users/:id', authMiddleware, requireAdmin, async (req, res
 });
 
 app.post('/api/admin/products', authMiddleware, requireAdmin, async (req, res) => {
-  const { name, category, price, stock, image, imageCategory, imageFolder, imageDataUrl, imageFileName } = req.body || {};
+  const { name, category, price, stock, image, imageCategory, imageFolder, imageDataUrl, imageFileName, brand, sku, short_description, description, sale_price, is_featured } = req.body || {};
   const dbCheck = await getDbOrFallbackRows('SELECT id FROM products LIMIT 1');
 
   let finalImage = typeof image === 'string' ? image.trim() : '';
@@ -856,12 +1193,17 @@ app.post('/api/admin/products', authMiddleware, requireAdmin, async (req, res) =
   }
 
   if (dbCheck.ok) {
+    const categoryRow = await pool.query('SELECT id FROM categories WHERE slug = ? LIMIT 1', [normalizeCategoryKey(category)]);
+    const categoryId = categoryRow[0][0]?.id || 4;
+    const slug = await createUniqueProductSlug(name || 'san-pham-moi');
     const [result] = await pool.query(
-      'INSERT INTO products (name, category, price, stock, image, is_active) VALUES (?, ?, ?, ?, ?, ?)',
-      [name || 'Sản phẩm mới', category || 'accessory', Number(price || 0), Number(stock || 0), finalImage || '', 1]
+      'INSERT INTO products (name, slug, category_id, brand, sku, short_description, description, price, sale_price, stock, image, is_featured, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [name || 'Sản phẩm mới', slug, categoryId, brand || null, sku || null, short_description || null, description || null, Number(price || 0), sale_price === undefined ? null : Number(sale_price), Number(stock || 0), finalImage || '', Number(Boolean(is_featured)), 1]
     );
     const inserted = await pool.query(
-      'SELECT id, name, category, price, stock, image, is_active, created_at, updated_at FROM products WHERE id = ? LIMIT 1',
+      `SELECT p.id, p.name, c.name AS category, p.price, p.stock, p.image, p.is_active, p.created_at, p.updated_at
+       FROM products p LEFT JOIN categories c ON c.id = p.category_id
+       WHERE p.id = ? LIMIT 1`,
       [result.insertId]
     );
     return res.status(201).json({ message: 'Tạo sản phẩm thành công', product: inserted[0][0] });
@@ -875,7 +1217,7 @@ app.patch('/api/admin/products/:id', authMiddleware, requireAdmin, async (req, r
   if (dbCheck.ok) {
     if (dbCheck.rows.length === 0) return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
 
-    const { name, category, price, stock, image, imageCategory, imageFolder, imageDataUrl, imageFileName, is_active } = req.body || {};
+    const { name, category, price, stock, image, imageCategory, imageFolder, imageDataUrl, imageFileName, is_active, brand, sku, short_description, description, sale_price, is_featured } = req.body || {};
     let finalImage = typeof image === 'string' ? image.trim() : '';
 
     if (imageDataUrl) {
@@ -896,12 +1238,43 @@ app.patch('/api/admin/products/:id', authMiddleware, requireAdmin, async (req, r
       finalImage = path.relative(__dirname, filePath).split(path.sep).join('/');
     }
 
+    const categoryRow = await pool.query('SELECT id FROM categories WHERE slug = ? LIMIT 1', [normalizeCategoryKey(category)]);
+    const categoryId = categoryRow[0][0]?.id;
     await pool.query(
-      'UPDATE products SET name = COALESCE(?, name), category = COALESCE(?, category), price = COALESCE(?, price), stock = COALESCE(?, stock), image = COALESCE(?, image), is_active = COALESCE(?, is_active) WHERE id = ?',
-      [name || null, category || null, price === undefined ? null : Number(price), stock === undefined ? null : Number(stock), finalImage || null, is_active === undefined ? null : Number(Boolean(is_active)), productId]
+      `UPDATE products
+       SET name = COALESCE(?, name),
+           category_id = COALESCE(?, category_id),
+           brand = COALESCE(?, brand),
+           sku = COALESCE(?, sku),
+           short_description = COALESCE(?, short_description),
+           description = COALESCE(?, description),
+           price = COALESCE(?, price),
+           sale_price = COALESCE(?, sale_price),
+           stock = COALESCE(?, stock),
+           image = COALESCE(?, image),
+           is_featured = COALESCE(?, is_featured),
+           is_active = COALESCE(?, is_active)
+       WHERE id = ?`,
+      [
+        name || null,
+        categoryId || null,
+        brand || null,
+        sku || null,
+        short_description || null,
+        description || null,
+        price === undefined ? null : Number(price),
+        sale_price === undefined ? null : Number(sale_price),
+        stock === undefined ? null : Number(stock),
+        finalImage || null,
+        is_featured === undefined ? null : Number(Boolean(is_featured)),
+        is_active === undefined ? null : Number(Boolean(is_active)),
+        productId,
+      ]
     );
     const updated = await pool.query(
-      'SELECT id, name, category, price, stock, image, is_active, created_at, updated_at FROM products WHERE id = ? LIMIT 1',
+      `SELECT p.id, p.name, c.name AS category, p.price, p.stock, p.image, p.is_active, p.created_at, p.updated_at
+       FROM products p LEFT JOIN categories c ON c.id = p.category_id
+       WHERE p.id = ? LIMIT 1`,
       [productId]
     );
     return res.json({ message: 'Cập nhật sản phẩm thành công', product: updated[0][0] });
