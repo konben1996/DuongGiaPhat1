@@ -40,6 +40,16 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 0,
+  namedPlaceholders: true,
+});
+
+pool.on('connection', (connection) => {
+  connection.query("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
+  connection.query("SET character_set_client = utf8mb4");
+  connection.query("SET character_set_connection = utf8mb4");
+  connection.query("SET character_set_results = utf8mb4");
 });
 
 const memoryUsers = [];
