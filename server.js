@@ -176,6 +176,24 @@ function normalizeCategoryKey(value) {
   return 'accessory';
 }
 
+async function resolveCategoryId(category) {
+  const normalizedCategory = normalizeCategoryKey(category);
+  const result = await getDbOrFallbackRows('SELECT id FROM categories WHERE slug = ? LIMIT 1', [normalizedCategory]);
+
+  if (result.ok && result.rows.length > 0) {
+    return Number(result.rows[0].id) || 4;
+  }
+
+  const categoryIds = {
+    'gaming-laptop': 1,
+    'office-laptop': 2,
+    'gaming-pc': 3,
+    accessory: 4,
+  };
+
+  return categoryIds[normalizedCategory] || 4;
+}
+
 function slugify(input) {
   return String(input || '')
     .normalize('NFD')
@@ -647,7 +665,7 @@ async function seedProductsIfNeeded() {
 
 async function fetchAdminProducts() {
   const result = await getDbOrFallbackRows(
-    `SELECT p.id, p.name, c.slug AS category, c.name AS category_name, p.price, p.stock, p.image, p.is_active, p.created_at, p.updated_at
+    `SELECT p.id, p.name, p.category_id, c.slug AS category, c.name AS category_name, p.price, p.stock, p.image, p.is_active, p.created_at, p.updated_at
      FROM products p
      LEFT JOIN categories c ON c.id = p.category_id
      ORDER BY p.id DESC`
@@ -707,11 +725,25 @@ function normalizeCategoryPayload(body = {}) {
 
 app.post('/api/admin/categories', authMiddleware, requireAdmin, async (req, res) => {
   const payload = normalizeCategoryPayload(req.body || {});
+  const nextId = req.body?.id === undefined || req.body?.id === null || req.body?.id === '' ? null : Number(req.body.id);
+
   if (!payload.name) {
     return res.status(400).json({ message: 'Tên danh mục không được để trống' });
   }
 
+  if (nextId !== null && !Number.isFinite(nextId)) {
+    return res.status(400).json({ message: 'ID danh mục không hợp lệ' });
+  }
+
   const baseSlug = payload.slug || slugify(payload.name);
+
+  if (nextId !== null) {
+    const idDuplicate = await getDbOrFallbackRows('SELECT id FROM categories WHERE id = ? LIMIT 1', [nextId]);
+    if (idDuplicate.ok && idDuplicate.rows.length > 0) {
+      return res.status(409).json({ message: 'ID danh mục đã tồn tại' });
+    }
+  }
+
   const dbDuplicate = await getDbOrFallbackRows('SELECT id FROM categories WHERE slug = ? LIMIT 1', [baseSlug]);
   if (dbDuplicate.ok && dbDuplicate.rows.length > 0) {
     return res.status(409).json({ message: 'Slug danh mục đã tồn tại' });
@@ -719,14 +751,21 @@ app.post('/api/admin/categories', authMiddleware, requireAdmin, async (req, res)
 
   if (dbDuplicate.ok) {
     const slug = baseSlug;
+    const insertColumns = nextId === null
+      ? 'name, slug, parent_id, sort_order, is_active'
+      : 'id, name, slug, parent_id, sort_order, is_active';
+    const insertValues = nextId === null
+      ? [payload.name, slug, payload.parent_id, payload.sort_order, payload.is_active]
+      : [nextId, payload.name, slug, payload.parent_id, payload.sort_order, payload.is_active];
+
     const [result] = await pool.query(
-      'INSERT INTO categories (name, slug, parent_id, sort_order, is_active) VALUES (?, ?, ?, ?, ?)',
-      [payload.name, slug, payload.parent_id, payload.sort_order, payload.is_active]
+      `INSERT INTO categories (${insertColumns}) VALUES (${nextId === null ? '?, ?, ?, ?, ?' : '?, ?, ?, ?, ?, ?'})`,
+      insertValues
     );
 
     const inserted = await pool.query(
       'SELECT id, name, slug, parent_id, sort_order, is_active, created_at, updated_at FROM categories WHERE id = ? LIMIT 1',
-      [result.insertId]
+      [nextId !== null ? nextId : result.insertId]
     );
 
     return res.status(201).json({ message: 'Tạo danh mục thành công', category: inserted[0][0] });
@@ -747,6 +786,12 @@ app.patch('/api/admin/categories/:id', authMiddleware, requireAdmin, async (req,
   }
 
   const payload = normalizeCategoryPayload(req.body || {});
+  const nextId = req.body?.id === undefined || req.body?.id === null || req.body?.id === '' ? categoryId : Number(req.body.id);
+
+  if (!Number.isFinite(nextId)) {
+    return res.status(400).json({ message: 'ID danh mục không hợp lệ' });
+  }
+
   const nextName = payload.name || current.rows[0].name;
   const nextSlug = payload.slug || slugify(nextName);
   const nextParentId = payload.parent_id === null ? null : payload.parent_id;
@@ -758,14 +803,21 @@ app.patch('/api/admin/categories/:id', authMiddleware, requireAdmin, async (req,
     return res.status(409).json({ message: 'Slug danh mục đã tồn tại' });
   }
 
+  if (nextId !== categoryId) {
+    const idDuplicate = await getDbOrFallbackRows('SELECT id FROM categories WHERE id = ? LIMIT 1', [nextId]);
+    if (idDuplicate.ok && idDuplicate.rows.length > 0) {
+      return res.status(409).json({ message: 'ID danh mục đã tồn tại' });
+    }
+  }
+
   await pool.query(
-    'UPDATE categories SET name = ?, slug = ?, parent_id = ?, sort_order = ?, is_active = ? WHERE id = ?',
-    [nextName, nextSlug, nextParentId, nextSortOrder, nextIsActive, categoryId]
+    'UPDATE categories SET id = ?, name = ?, slug = ?, parent_id = ?, sort_order = ?, is_active = ? WHERE id = ?',
+    [nextId, nextName, nextSlug, nextParentId, nextSortOrder, nextIsActive, categoryId]
   );
 
   const updated = await pool.query(
     'SELECT id, name, slug, parent_id, sort_order, is_active, created_at, updated_at FROM categories WHERE id = ? LIMIT 1',
-    [categoryId]
+    [nextId]
   );
 
   return res.json({ message: 'Cập nhật danh mục thành công', category: updated[0][0] });
@@ -777,25 +829,25 @@ app.delete('/api/admin/categories/:id', authMiddleware, requireAdmin, async (req
     return res.status(400).json({ message: 'ID danh mục không hợp lệ' });
   }
 
-  const check = await getDbOrFallbackRows('SELECT id FROM categories WHERE id = ? LIMIT 1', [categoryId]);
+  const check = await getDbOrFallbackRows('SELECT id, slug FROM categories WHERE id = ? LIMIT 1', [categoryId]);
   if (!check.ok || check.rows.length === 0) {
     return res.status(404).json({ message: 'Không tìm thấy danh mục' });
   }
 
-  await pool.query('DELETE FROM categories WHERE id = ?', [categoryId]);
-  return res.json({ message: 'Xoá danh mục thành công' });
-});
+  const currentCategorySlug = String(check.rows[0].slug || '').toLowerCase();
+  const fallbackCategorySlug = currentCategorySlug === 'accessory' ? 'gaming-pc' : 'accessory';
+  const fallbackCategoryId = await resolveCategoryId(fallbackCategorySlug);
 
-async function fetchAdminInventory() {
-  const result = await getDbOrFallbackRows(
-    `SELECT i.id, i.product_id, p.name AS product_name, i.quantity, i.reserved_quantity, i.warehouse_location, i.updated_at
-     FROM inventory i
-     LEFT JOIN products p ON p.id = i.product_id
-     ORDER BY i.id DESC`
-  );
-  if (result.ok) return result.rows;
-  return [];
-}
+  if (fallbackCategoryId !== categoryId) {
+    await pool.query('UPDATE products SET category_id = ? WHERE category_id = ?', [fallbackCategoryId, categoryId]);
+  }
+
+  await pool.query('DELETE FROM categories WHERE id = ?', [categoryId]);
+  return res.json({
+    message: 'Xoá danh mục thành công',
+    movedProductsToCategoryId: fallbackCategoryId,
+  });
+});
 
 async function fetchAdminCoupons() {
   const result = await getDbOrFallbackRows(
@@ -906,10 +958,6 @@ app.get('/api/admin/categories', authMiddleware, requireAdmin, async (req, res) 
   return res.json({ categories });
 });
 
-app.get('/api/admin/inventory', authMiddleware, requireAdmin, async (req, res) => {
-  const inventory = await fetchAdminInventory();
-  return res.json({ inventory });
-});
 
 app.get('/api/admin/users', authMiddleware, requireAdmin, async (req, res) => {
   const users = await fetchAdminUsers();
@@ -1180,18 +1228,16 @@ app.delete('/api/admin/users/:id', authMiddleware, requireAdmin, async (req, res
 });
 
 app.post('/api/admin/products', authMiddleware, requireAdmin, async (req, res) => {
-  const { name, category, price, stock, image, imageCategory, imageFolder, imageDataUrl, imageFileName, brand, sku, short_description, description, sale_price, is_featured } = req.body || {};
+  const { name, category, category_id, price, stock, image, imageCategory, imageFolder, imageDataUrl, imageFileName, brand, sku, short_description, description, sale_price, is_featured } = req.body || {};
   const dbCheck = await getDbOrFallbackRows('SELECT id FROM products LIMIT 1');
 
   let finalImage = typeof image === 'string' ? image.trim() : '';
   if (imageDataUrl) {
     const targetCategory = resolveImageCategory(category, imageCategory);
-    const folderName = sanitizeFolderName(imageFolder);
-    if (!folderName) {
-      return res.status(400).json({ message: 'Vui lòng nhập tên thư mục lưu ảnh' });
-    }
-
-    const targetDir = path.join(CATEGORY_IMAGE_DIRS[targetCategory] || CATEGORY_IMAGE_DIRS.accessory, folderName);
+    const productSlug = sanitizeFolderName(slugify(name || 'san-pham-moi'));
+    const folderName = sanitizeFolderName(imageFolder) || productSlug;
+    const baseDir = CATEGORY_IMAGE_DIRS[targetCategory] || CATEGORY_IMAGE_DIRS.accessory;
+    const targetDir = path.join(baseDir, productSlug, folderName);
     ensureDirectoryExists(targetDir);
 
     const { mimeType, buffer } = decodeDataUrlImage(imageDataUrl);
@@ -1203,15 +1249,14 @@ app.post('/api/admin/products', authMiddleware, requireAdmin, async (req, res) =
   }
 
   if (dbCheck.ok) {
-    const categoryRow = await pool.query('SELECT id FROM categories WHERE slug = ? LIMIT 1', [normalizeCategoryKey(category)]);
-    const categoryId = categoryRow[0][0]?.id || 4;
+    const categoryId = Number(category_id) || await resolveCategoryId(category);
     const slug = await createUniqueProductSlug(name || 'san-pham-moi');
     const [result] = await pool.query(
       'INSERT INTO products (name, slug, category_id, brand, sku, short_description, description, price, sale_price, stock, image, is_featured, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [name || 'Sản phẩm mới', slug, categoryId, brand || null, sku || null, short_description || null, description || null, Number(price || 0), sale_price === undefined ? null : Number(sale_price), Number(stock || 0), finalImage || '', Number(Boolean(is_featured)), 1]
     );
     const inserted = await pool.query(
-      `SELECT p.id, p.name, c.name AS category, p.price, p.stock, p.image, p.is_active, p.created_at, p.updated_at
+      `SELECT p.id, p.name, p.category_id, c.slug AS category, c.name AS category_name, p.price, p.stock, p.image, p.is_active, p.created_at, p.updated_at
        FROM products p LEFT JOIN categories c ON c.id = p.category_id
        WHERE p.id = ? LIMIT 1`,
       [result.insertId]
@@ -1227,17 +1272,15 @@ app.patch('/api/admin/products/:id', authMiddleware, requireAdmin, async (req, r
   if (dbCheck.ok) {
     if (dbCheck.rows.length === 0) return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
 
-    const { name, category, price, stock, image, imageCategory, imageFolder, imageDataUrl, imageFileName, is_active, brand, sku, short_description, description, sale_price, is_featured } = req.body || {};
+    const { name, category, category_id, price, stock, image, imageCategory, imageFolder, imageDataUrl, imageFileName, is_active, brand, sku, short_description, description, sale_price, is_featured } = req.body || {};
     let finalImage = typeof image === 'string' ? image.trim() : '';
 
     if (imageDataUrl) {
       const targetCategory = resolveImageCategory(category, imageCategory);
-      const folderName = sanitizeFolderName(imageFolder);
-      if (!folderName) {
-        return res.status(400).json({ message: 'Vui lòng nhập tên thư mục lưu ảnh' });
-      }
-
-      const targetDir = path.join(CATEGORY_IMAGE_DIRS[targetCategory] || CATEGORY_IMAGE_DIRS.accessory, folderName);
+      const productSlug = sanitizeFolderName(slugify(name || 'san-pham-moi'));
+      const folderName = sanitizeFolderName(imageFolder) || productSlug;
+      const baseDir = CATEGORY_IMAGE_DIRS[targetCategory] || CATEGORY_IMAGE_DIRS.accessory;
+      const targetDir = path.join(baseDir, productSlug, folderName);
       ensureDirectoryExists(targetDir);
 
       const { mimeType, buffer } = decodeDataUrlImage(imageDataUrl);
@@ -1248,8 +1291,7 @@ app.patch('/api/admin/products/:id', authMiddleware, requireAdmin, async (req, r
       finalImage = path.relative(__dirname, filePath).split(path.sep).join('/');
     }
 
-    const categoryRow = await pool.query('SELECT id FROM categories WHERE slug = ? LIMIT 1', [normalizeCategoryKey(category)]);
-    const categoryId = categoryRow[0][0]?.id;
+    const categoryId = Number(category_id) || await resolveCategoryId(category);
     await pool.query(
       `UPDATE products
        SET name = COALESCE(?, name),
@@ -1282,7 +1324,7 @@ app.patch('/api/admin/products/:id', authMiddleware, requireAdmin, async (req, r
       ]
     );
     const updated = await pool.query(
-      `SELECT p.id, p.name, c.name AS category, p.price, p.stock, p.image, p.is_active, p.created_at, p.updated_at
+      `SELECT p.id, p.name, p.category_id, c.slug AS category, c.name AS category_name, p.price, p.stock, p.image, p.is_active, p.created_at, p.updated_at
        FROM products p LEFT JOIN categories c ON c.id = p.category_id
        WHERE p.id = ? LIMIT 1`,
       [productId]

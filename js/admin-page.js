@@ -17,7 +17,6 @@ const els = {
     dashboard: document.getElementById("panel-dashboard"),
     categories: document.getElementById("panel-categories"),
     products: document.getElementById("panel-products"),
-    inventory: document.getElementById("panel-inventory"),
     orders: document.getElementById("panel-orders"),
     users: document.getElementById("panel-users"),
     coupons: document.getElementById("panel-coupons"),
@@ -31,6 +30,7 @@ const els = {
   openAddOrderForm: document.getElementById("openAddOrderForm"),
   categoryModal: document.getElementById("adminCategoryModal"),
   categoryForm: document.getElementById("adminCategoryForm"),
+  categoryIdInput: document.getElementById("adminCategoryId"),
   categoryName: document.getElementById("adminCategoryName"),
   categorySlug: document.getElementById("adminCategorySlug"),
   categoryParent: document.getElementById("adminCategoryParent"),
@@ -57,14 +57,12 @@ const els = {
   dashboardProductsTable: document.getElementById("dashboardProductsTable"),
   productsTable: document.getElementById("productsTable"),
   categoriesTable: document.getElementById("categoriesTable"),
-  inventoryTable: document.getElementById("inventoryTable"),
   ordersTable: document.getElementById("ordersTable"),
   usersTable: document.getElementById("usersTable"),
   couponsTable: document.getElementById("couponsTable"),
   bannersTable: document.getElementById("bannersTable"),
   reviewsTable: document.getElementById("reviewsTable"),
   warrantiesTable: document.getElementById("warrantiesTable"),
-
   categoryModal: document.getElementById("adminCategoryModal"),
   categoryForm: document.getElementById("adminCategoryForm"),
   categoryName: document.getElementById("adminCategoryName"),
@@ -76,14 +74,12 @@ const els = {
   productModal: document.getElementById("adminProductModal"),
   productForm: document.getElementById("adminProductForm"),
   productName: document.getElementById("adminProductName"),
-  productSlug: document.getElementById("adminProductSlug"),
   productCategory: document.getElementById("adminProductCategory"),
-  productBrand: document.getElementById("adminProductBrand"),
-  productSku: document.getElementById("adminProductSku"),
   productPrice: document.getElementById("adminProductPrice"),
   productSalePrice: document.getElementById("adminProductSalePrice"),
   productStock: document.getElementById("adminProductStock"),
   productImage: document.getElementById("adminProductImage"),
+  productImagePreview: document.getElementById("adminProductImagePreview"),
   productShortDescription: document.getElementById("adminProductShortDescription"),
   productDescription: document.getElementById("adminProductDescription"),
   productFeatured: document.getElementById("adminProductFeatured"),
@@ -107,6 +103,7 @@ const els = {
   orderPaymentMethod: document.getElementById("adminOrderPaymentMethod"),
   orderStatusText: document.getElementById("adminOrderStatusText"),
 
+
   userModal: document.getElementById("adminUserModal"),
   userForm: document.getElementById("adminUserForm"),
   userName: document.getElementById("adminUserName"),
@@ -120,7 +117,6 @@ const state = {
   token: localStorage.getItem("authToken") || sessionStorage.getItem("authToken") || "",
   products: [],
   categories: [],
-  inventory: [],
   orders: [],
   users: [],
   coupons: [],
@@ -133,6 +129,16 @@ const state = {
   editingOrderId: null,
   editingUserId: null,
 };
+
+function slugify(value = "") {
+  return String(value)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
+}
 
 function getToken() {
   return localStorage.getItem("authToken") || sessionStorage.getItem("authToken") || state.token || "";
@@ -242,12 +248,12 @@ function topCategory(products) {
 
 function renderProductCategoryOptions() {
   const categoryOptions = state.categories.length
-    ? state.categories.map((category) => `<option value="${category.slug}">${category.name}</option>`).join("")
+    ? state.categories.map((category) => `<option value="${category.id}">${fixText(category.name || "")}</option>`).join("")
     : `
-      <option value="gaming-laptop">Gaming Laptop</option>
-      <option value="office-laptop">Office Laptop</option>
-      <option value="gaming-pc">Gaming PC</option>
-      <option value="accessory">Accessory</option>
+      <option value="1">Gaming Laptop</option>
+      <option value="2">Office Laptop</option>
+      <option value="3">Gaming PC</option>
+      <option value="4">Accessory</option>
     `;
 
   if (els.productCategory) {
@@ -336,9 +342,10 @@ function renderAll() {
   }
 
   if (els.categoriesTable) {
-    if (!state.categories.length) renderEmpty(els.categoriesTable, 6, "Chưa có dữ liệu.");
+    if (!state.categories.length) renderEmpty(els.categoriesTable, 7, "Chưa có dữ liệu.");
     else els.categoriesTable.innerHTML = state.categories.map((category) => `
       <tr>
+        <td>${category.id ?? "---"}</td>
         <td>${fixText(category.name || "")}</td>
         <td>${fixText(category.slug || "")}</td>
         <td>${category.parent_id || "---"}</td>
@@ -349,13 +356,6 @@ function renderAll() {
           <button type="button" class="btn btn--light" data-action="delete-category" data-id="${category.id}">Xoá</button>
         </td>
       </tr>
-    `).join("");
-  }
-
-  if (els.inventoryTable) {
-    if (!state.inventory.length) renderEmpty(els.inventoryTable, 4, "Chưa có dữ liệu.");
-    else els.inventoryTable.innerHTML = state.inventory.map((row) => `
-      <tr><td>${row.product_name || row.product_id}</td><td>${row.warehouse_location || "---"}</td><td>${row.quantity || 0}</td><td>${row.reserved_quantity || 0}</td></tr>
     `).join("");
   }
 
@@ -424,6 +424,7 @@ function fillCategoryForm(category = null) {
   state.editingCategoryId = category?.id || null;
   els.categoryForm?.reset();
 
+  if (els.categoryIdInput) els.categoryIdInput.value = category?.id || "";
   els.categoryName.value = category?.name || "";
   els.categorySlug.value = category?.slug || "";
   els.categoryParent.value = category?.parent_id || "";
@@ -438,7 +439,7 @@ function applyProductFilter() {
   const search = (els.productSearch?.value || "").trim().toLowerCase();
   const category = els.productCategoryFilter?.value || "all";
   state.filteredProducts = state.products.filter((product) => {
-    const matchSearch = !search || `${product.name || ""} ${product.sku || ""} ${product.brand || ""}`.toLowerCase().includes(search);
+    const matchSearch = !search || `${product.name || ""}`.toLowerCase().includes(search);
     const matchCategory = category === "all" || product.category === category;
     return matchSearch && matchCategory;
   });
@@ -446,13 +447,12 @@ function applyProductFilter() {
 }
 
 async function loadData() {
-  const [dashboard, products, users, orders, categories, inventory, coupons, banners, reviews, warranties] = await Promise.all([
+  const [dashboard, products, users, orders, categories, coupons, banners, reviews, warranties] = await Promise.all([
     apiFetch("/api/admin/dashboard"),
     apiFetch("/api/admin/products"),
     apiFetch("/api/admin/users"),
     apiFetch("/api/admin/orders"),
     apiFetch("/api/admin/categories").catch(() => ({ categories: [] })),
-    apiFetch("/api/admin/inventory").catch(() => ({ inventory: [] })),
     apiFetch("/api/admin/coupons").catch(() => ({ coupons: [] })),
     apiFetch("/api/admin/banners").catch(() => ({ banners: [] })),
     apiFetch("/api/admin/reviews").catch(() => ({ reviews: [] })),
@@ -463,7 +463,6 @@ async function loadData() {
   state.users = users.users || [];
   state.orders = orders.orders || [];
   state.categories = (categories.categories || []).length ? categories.categories : [...DEFAULT_CATEGORIES];
-  state.inventory = inventory.inventory || [];
   state.coupons = coupons.coupons || [];
   state.banners = banners.banners || [];
   state.reviews = reviews.reviews || [];
@@ -513,26 +512,53 @@ function populateOrderProducts(selected = "") {
   if (selected) els.orderProducts.value = selected;
 }
 
-function fillProductForm(product = null) {
+function syncProductImageTarget() {
+  const categoryId = Number(els.productCategory?.value || 4);
+  const category = state.categories.find((item) => Number(item.id) === categoryId);
+  const imageCategory = category?.slug || "accessory";
+
+  if (els.productImageCategory) els.productImageCategory.value = imageCategory;
+  if (els.productImageFolder) {
+    const name = els.productName?.value || "";
+    els.productImageFolder.value = slugify(name || "san-pham-moi");
+  }
+}
+
+function updateProductImagePreview(src = "", alt = "Ảnh sản phẩm") {
+  if (!els.productImagePreview) return;
+  const value = String(src || "").trim();
+  if (!value) {
+    els.productImagePreview.innerHTML = "Chưa có ảnh";
+    return;
+  }
+  els.productImagePreview.innerHTML = `<img src="${value}" alt="${alt}" />`;
+}
+
+function openProductForm(product = null) {
   state.editingProductId = product?.id || null;
   els.productForm?.reset();
 
   els.productName.value = product?.name || "";
-  els.productSlug.value = product?.slug || "";
-  els.productCategory.value = product?.category || "gaming-laptop";
-  state.autoSlugFromName = product?.slug || "";
-  els.productBrand.value = product?.brand || "";
-  els.productSku.value = product?.sku || "";
+
+  const categoryId = product?.category_id || state.categories.find((item) => item.slug === product?.category)?.id || 4;
+  const categorySlug = state.categories.find((item) => Number(item.id) === Number(categoryId))?.slug || "accessory";
+  els.productCategory.value = String(categoryId);
+
   els.productPrice.value = product?.price || 0;
   els.productSalePrice.value = product?.sale_price || "";
   els.productStock.value = product?.stock || 0;
   els.productImage.value = product?.image || "";
+  updateProductImagePreview(product?.image || "");
   els.productShortDescription.value = product?.short_description || "";
   els.productDescription.value = product?.description || "";
   els.productFeatured.checked = Boolean(product?.is_featured);
   els.productActive.checked = product?.is_active !== false;
+  if (els.productImageFolder) els.productImageFolder.value = slugify(product?.name || "san-pham-moi");
+  if (els.productImageCategory) {
+    els.productImageCategory.value = categorySlug;
+  }
+  if (els.productImageFile) els.productImageFile.value = "";
   els.productStatus.textContent = product ? "Đang chỉnh sửa sản phẩm." : "";
-
   openModal(els.productModal);
 }
 
@@ -575,14 +601,24 @@ function bindEvents() {
   }));
 
   els.refreshAdminData?.addEventListener("click", loadData);
-  els.openAddProductForm?.addEventListener("click", () => fillProductForm());
-  els.openAddCategoryForm?.addEventListener("click", () => fillCategoryForm());
-  els.openAddOrderForm?.addEventListener("click", () => fillOrderForm());
+  els.openAddProductForm?.addEventListener("click", (event) => {
+    event.preventDefault();
+    openProductForm();
+  });
+  els.openAddCategoryForm?.addEventListener("click", (event) => {
+    event.preventDefault();
+    fillCategoryForm();
+  });
+  els.openAddOrderForm?.addEventListener("click", (event) => {
+    event.preventDefault();
+    fillOrderForm();
+  });
 
   els.categoryForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const payload = {
+      id: els.categoryIdInput?.value ? Number(els.categoryIdInput.value) : null,
       name: (els.categoryName?.value || "").trim(),
       slug: (els.categorySlug?.value || "").trim(),
       parent_id: els.categoryParent?.value === "" ? null : Number(els.categoryParent?.value || 0),
@@ -602,21 +638,6 @@ function bindEvents() {
   els.productCategoryFilter?.addEventListener("change", applyProductFilter);
   els.orderSearch?.addEventListener("input", renderAll);
 
-  els.productName?.addEventListener("input", () => {
-    if (!els.productSlug) return;
-    const currentSlug = (els.productSlug.value || "").trim();
-    const derivedSlug = fixText(els.productName.value || "").trim()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
-
-    if (!currentSlug || currentSlug === state.autoSlugFromName) {
-      els.productSlug.value = derivedSlug;
-      state.autoSlugFromName = derivedSlug;
-    }
-  });
 
   document.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-action]");
@@ -627,7 +648,7 @@ function bindEvents() {
 
     if (action === "edit-product") {
       const product = state.products.find((item) => String(item.id) === String(id));
-      if (product) fillProductForm(product);
+      if (product) openProductForm(product);
     }
 
     if (action === "delete-product") {
@@ -668,13 +689,31 @@ function bindEvents() {
     closeModal(els.userModal);
   });
 
+  function syncProductImageTarget() {
+    const category = els.productCategory?.value || "accessory";
+    if (els.productImageCategory) els.productImageCategory.value = category;
+    if (els.productImageFolder) {
+      const name = els.productName?.value || "";
+      els.productImageFolder.value = slugify(name || "san-pham-moi");
+    }
+  }
+
   els.productCategory?.addEventListener("change", () => {
-    if (els.productImageCategory) els.productImageCategory.value = els.productCategory.value;
+    syncProductImageTarget();
+    updateProductImagePreview(els.productImage?.value || "");
   });
 
   els.productImageFile?.addEventListener("change", () => {
     const file = els.productImageFile.files?.[0];
-    if (file && els.productImage) els.productImage.placeholder = file.name;
+    if (file && els.productImage) {
+      els.productImage.value = "";
+      els.productImage.placeholder = file.name;
+      const previewUrl = URL.createObjectURL(file);
+      updateProductImagePreview(previewUrl, file.name);
+    } else {
+      updateProductImagePreview(els.productImage?.value || "");
+    }
+    syncProductImageTarget();
   });
 
   els.categoryForm?.addEventListener("submit", async (event) => {
@@ -706,17 +745,17 @@ function bindEvents() {
       reader.readAsDataURL(file);
     }) : "";
 
+    const imageCategory = els.productImageCategory?.value || "";
+    const imageFolder = (els.productImageFolder?.value?.trim() || slugify(els.productName.value || "san-pham-moi")).trim();
+    const selectedCategoryId = Number(els.productCategory.value || 4);
+    const categoryId = Number.isFinite(selectedCategoryId) ? selectedCategoryId : 4;
+    const previewUrl = imageDataUrl || els.productImage.value.trim();
+    updateProductImagePreview(previewUrl, file?.name || els.productName.value || "Ảnh sản phẩm");
+
     const payload = {
       name: els.productName.value.trim(),
-      slug: els.productSlug.value.trim() || fixText(els.productName.value.trim())
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, ""),
-      category: els.productCategory.value,
-      brand: els.productBrand.value.trim(),
-      sku: els.productSku.value.trim(),
+      category: state.categories.find((item) => Number(item.id) === Number(categoryId))?.slug || "accessory",
+      category_id: categoryId,
       price: Number(els.productPrice.value || 0),
       sale_price: els.productSalePrice.value ? Number(els.productSalePrice.value) : null,
       stock: Number(els.productStock.value || 0),
@@ -725,8 +764,8 @@ function bindEvents() {
       description: els.productDescription.value.trim(),
       is_featured: els.productFeatured.checked,
       is_active: els.productActive.checked,
-      imageCategory: els.productImageCategory?.value || els.productCategory.value,
-      imageFolder: els.productImageFolder?.value?.trim() || "",
+      imageCategory,
+      imageFolder,
       imageDataUrl,
       imageFileName: file?.name || "",
     };
