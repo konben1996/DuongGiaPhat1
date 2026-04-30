@@ -74,10 +74,10 @@ const els = {
   productModal: document.getElementById("adminProductModal"),
   productForm: document.getElementById("adminProductForm"),
   productName: document.getElementById("adminProductName"),
+  productBrand: document.getElementById("adminProductBrand"),
   productCategory: document.getElementById("adminProductCategory"),
   productPrice: document.getElementById("adminProductPrice"),
   productSalePrice: document.getElementById("adminProductSalePrice"),
-  productStock: document.getElementById("adminProductStock"),
   productImage: document.getElementById("adminProductImage"),
   productImagePreview: document.getElementById("adminProductImagePreview"),
   productShortDescription: document.getElementById("adminProductShortDescription"),
@@ -187,6 +187,7 @@ function fixText(text) {
 function openModal(modal) {
   if (!modal) return;
   modal.classList.add("is-open");
+  modal.style.display = "block";
   modal.setAttribute("aria-hidden", "false");
   document.body.classList.add("is-locked");
   if (els.globalBackdrop) els.globalBackdrop.hidden = false;
@@ -195,6 +196,7 @@ function openModal(modal) {
 function closeModal(modal) {
   if (!modal) return;
   modal.classList.remove("is-open");
+  modal.style.display = "none";
   modal.setAttribute("aria-hidden", "true");
   document.body.classList.remove("is-locked");
   if (els.globalBackdrop) els.globalBackdrop.hidden = true;
@@ -325,12 +327,10 @@ function renderAll() {
               <strong>${product.name || "---"}</strong>
             </div>
           </td>
-          <td>${product.sku || "---"}</td>
           <td>${labelCategory(product.category)}</td>
+          <td>${product.brand || "---"}</td>
           <td>${formatMoney(product.price)}</td>
           <td>${product.sale_price ? formatMoney(product.sale_price) : "---"}</td>
-          <td>${product.stock || 0}</td>
-          <td>${product.is_featured ? "Yes" : "No"}</td>
           <td>${product.is_active ? "Active" : "Hidden"}</td>
           <td>
             <button type="button" class="btn btn--light" data-action="edit-product" data-id="${product.id}">Sửa</button>
@@ -539,6 +539,7 @@ function openProductForm(product = null) {
   els.productForm?.reset();
 
   els.productName.value = product?.name || "";
+  if (els.productBrand) els.productBrand.value = product?.brand || "";
 
   const categoryId = product?.category_id || state.categories.find((item) => item.slug === product?.category)?.id || 4;
   const categorySlug = state.categories.find((item) => Number(item.id) === Number(categoryId))?.slug || "accessory";
@@ -546,7 +547,6 @@ function openProductForm(product = null) {
 
   els.productPrice.value = product?.price || 0;
   els.productSalePrice.value = product?.sale_price || "";
-  els.productStock.value = product?.stock || 0;
   els.productImage.value = product?.image || "";
   updateProductImagePreview(product?.image || "");
   els.productShortDescription.value = product?.short_description || "";
@@ -754,11 +754,11 @@ function bindEvents() {
 
     const payload = {
       name: els.productName.value.trim(),
+      brand: els.productBrand?.value.trim() || "",
       category: state.categories.find((item) => Number(item.id) === Number(categoryId))?.slug || "accessory",
       category_id: categoryId,
       price: Number(els.productPrice.value || 0),
       sale_price: els.productSalePrice.value ? Number(els.productSalePrice.value) : null,
-      stock: Number(els.productStock.value || 0),
       image: els.productImage.value.trim(),
       short_description: els.productShortDescription.value.trim(),
       description: els.productDescription.value.trim(),

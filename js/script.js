@@ -1,7 +1,7 @@
 const API_BASE_URL = window.API_BASE_URL || window.location.origin;
-const productDataSources = Object.values(window.DuongGiaStoreProducts || {});
-const products = productDataSources.flatMap((source) => source.products || []);
-const productGalleries = productDataSources.reduce(
+const localProductDataSources = Object.values(window.DuongGiaStoreProducts || {});
+const localProducts = localProductDataSources.flatMap((source) => source.products || []);
+const localProductGalleries = localProductDataSources.reduce(
   (acc, source) => Object.assign(acc, source.productGalleries || {}),
   {}
 );
@@ -10,6 +10,10 @@ const defaultProductImage =
   "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80";
 const imagePlaceholder =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3C/svg%3E";
+
+let products = [];
+let productGalleries = {};
+let dataSource = "local";
 
 const state = {
   currentSlide: 0,
@@ -109,8 +113,32 @@ function initTheme() {
   });
 }
 
+function normalizeProduct(product) {
+  const price = Number(product.price || 0);
+  const oldPrice = Number(product.oldPrice || product.original_price || 0);
+  const discount = Number(product.discount || (oldPrice > price && oldPrice > 0 ? Math.round(((oldPrice - price) / oldPrice) * 100) : 0));
+  const category = String(product.category || "accessory").trim();
+  const tags = Array.isArray(product.tags) ? product.tags : [];
+
+  return {
+    id: String(product.id ?? product.slug ?? product.name),
+    name: product.name || "Sản phẩm",
+    price,
+    oldPrice: oldPrice > price ? oldPrice : null,
+    discount: Number.isFinite(discount) ? discount : 0,
+    category,
+    label: product.label || product.category_name || product.categoryLabel || "Phụ kiện",
+    image: product.image || defaultProductImage,
+    stock: typeof product.stock === "number" ? (product.stock > 0 ? "Còn hàng" : "Hết hàng") : (product.stock || "Còn hàng"),
+    brand: product.brand || "",
+    summary: product.summary || product.short_description || product.description || "",
+    specs: Array.isArray(product.specs) ? product.specs : [],
+    tags: tags.length ? tags : [product.sale_price ? "discount" : "newArrival"],
+  };
+}
+
 function findProductById(productId) {
-  return products.find((product) => product.id === productId);
+  return products.find((product) => String(product.id) === String(productId));
 }
 
 function getProductImage(product) {
@@ -118,7 +146,7 @@ function getProductImage(product) {
 }
 
 function getProductGallery(product) {
-  const extraImages = productGalleries[product.id] || [];
+  const extraImages = productGalleries[String(product.id)] || productGalleries[product.id] || [];
 
   return [getProductImage(product), ...extraImages]
     .filter(Boolean)
@@ -133,7 +161,7 @@ function getFilteredProducts(baseList = products) {
 }
 
 function getProductsByTag(tagName) {
-  return getFilteredProducts().filter((product) => product.tags.includes(tagName));
+  return getFilteredProducts().filter((product) => Array.isArray(product.tags) && product.tags.includes(tagName));
 }
 
 function getTabProducts() {
@@ -143,7 +171,7 @@ function getTabProducts() {
 function createProductCard(product) {
   return `
     <article class="product-card">
-      <div class="product-card__discount">-${product.discount}%</div>
+      <div class="product-card__discount">-${product.discount || 0}%</div>
       <div class="product-card__media">
         <img
           src="${imagePlaceholder}"
@@ -241,6 +269,38 @@ function renderCategorySections() {
   renderGrid(elements.laptopGrid, laptopProducts.slice(0, 10));
   renderGrid(elements.desktopGrid, desktopProducts.slice(0, 10));
   renderGrid(elements.gamingGrid, gamingProducts.slice(0, 10));
+}
+
+async function fetchProductsFromApi() {
+  const response = await fetch(`${API_BASE_URL}/api/products?limit=500`);
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Không thể tải sản phẩm");
+  }
+
+  return Array.isArray(data.products) ? data.products.map(normalizeProduct) : [];
+}
+
+function seedLocalProducts() {
+  products = localProducts.map(normalizeProduct);
+  productGalleries = localProductGalleries;
+  dataSource = "local";
+}
+
+async function loadProducts() {
+  try {
+    const apiProducts = await fetchProductsFromApi();
+    if (apiProducts.length) {
+      products = apiProducts;
+      productGalleries = {};
+      dataSource = "api";
+      return;
+    }
+    seedLocalProducts();
+  } catch (error) {
+    seedLocalProducts();
+  }
 }
 
 function renderNewProductsSection() {
@@ -836,12 +896,14 @@ function initEvents() {
 
 async function init() {
   initTheme();
+  initEvents();
+
+  await loadProducts();
   buildHeroDots();
   renderTabProducts();
   renderCategorySections();
   renderNewProductsSection();
   renderPromoProductsSection();
-  initEvents();
 
   const auth = getStoredAuth();
 

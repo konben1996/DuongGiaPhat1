@@ -128,7 +128,7 @@
               <button class="btn btn--primary" id="openAddProductForm" type="button">+ Thêm sản phẩm</button>
             </div>
             <div class="admin-toolbar">
-              <input type="search" id="productSearch" placeholder="Tìm theo tên, SKU, brand..." />
+              <input type="search" id="productSearch" placeholder="Tìm theo tên, brand..." />
               <select id="productCategoryFilter">
                 <option value="all">Tất cả danh mục</option>
                 <option value="gaming-laptop">Gaming Laptop</option>
@@ -142,18 +142,16 @@
                 <thead>
                   <tr>
                     <th>Tên</th>
-                    <th>SKU</th>
                     <th>Danh mục</th>
+                    <th>Brand</th>
                     <th>Giá</th>
                     <th>Sale</th>
-                    <th>Tồn kho</th>
-                    <th>Featured</th>
                     <th>Active</th>
                     <th>Hành động</th>
                   </tr>
                 </thead>
                 <tbody id="productsTable">
-                  <tr><td colspan="9" class="admin-table__empty">Chưa có dữ liệu.</td></tr>
+                  <tr><td colspan="7" class="admin-table__empty">Chưa có dữ liệu.</td></tr>
                 </tbody>
               </table>
             </div>
@@ -356,12 +354,13 @@
           <span class="section-kicker">Products</span>
           <h3 id="adminProductModalTitle">Thêm / sửa sản phẩm</h3>
           <p>Thiết kế gọn hơn, tập trung vào các trường quan trọng và ảnh đại diện.</p>
-
+        </div>
 
         <form class="product-form" id="adminProductForm">
           <div class="product-form__grid">
             <div class="product-form__main">
               <label><span>Tên</span><input id="adminProductName" type="text" /></label>
+              <label><span>Brand</span><input id="adminProductBrand" type="text" placeholder="VD: ASUS, MSI, Logitech" /></label>
               <div class="product-form__grid-two">
                 <label><span>Category</span><select id="adminProductCategory"><option value="1">Gaming Laptop</option><option value="2">Office Laptop</option><option value="3">Gaming PC</option><option value="4">Accessory</option></select></label>
                 <label><span>Slug ảnh</span><select id="adminProductImageFolder"><option value="san-pham-moi">San pham moi</option><option value="gaming-laptop">Gaming Laptop</option><option value="office-laptop">Office Laptop</option><option value="gaming-pc">Gaming PC</option><option value="accessory">Accessory</option></select></label>
@@ -370,7 +369,6 @@
                 <label><span>Giá</span><input id="adminProductPrice" type="number" /></label>
                 <label><span>Sale price</span><input id="adminProductSalePrice" type="number" /></label>
               </div>
-              <label><span>Tồn kho</span><input id="adminProductStock" type="number" /></label>
               <div class="product-form__grid-two">
                 <label><span>Mô tả ngắn</span><input id="adminProductShortDescription" type="text" /></label>
                 <label><span>Mô tả</span><input id="adminProductDescription" type="text" /></label>

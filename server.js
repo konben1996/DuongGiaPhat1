@@ -23,6 +23,67 @@ app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 app.use(express.static(__dirname));
 
+app.get('/api/products', async (req, res) => {
+  const limit = Number(req.query.limit || 0);
+  const offset = Number(req.query.offset || 0);
+  const category = typeof req.query.category === 'string' ? normalizeCategoryKey(req.query.category) : null;
+  const tag = typeof req.query.tag === 'string' ? String(req.query.tag).trim() : null;
+
+  try {
+    const dbResult = await getDbOrFallbackRows(
+      `SELECT p.id, p.slug, p.name, p.short_description, p.description, p.price, p.sale_price, p.stock, p.image,
+              p.is_featured, p.is_active, p.brand, c.slug AS category_slug, c.name AS category_name
+       FROM products p
+       LEFT JOIN categories c ON c.id = p.category_id
+       WHERE p.is_active = 1
+       ORDER BY p.is_featured DESC, p.id DESC`
+    );
+
+    const rows = dbResult.ok ? dbResult.rows.map(normalizePublicProductRow) : loadLocalProducts();
+    let filtered = rows;
+
+    if (category) {
+      filtered = filtered.filter((product) => product.category === category);
+    }
+
+    if (tag) {
+      filtered = filtered.filter((product) => Array.isArray(product.tags) && product.tags.includes(tag));
+    }
+
+    const safeOffset = Number.isFinite(offset) && offset > 0 ? Math.floor(offset) : 0;
+    const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 0;
+    const paginated = safeLimit > 0 ? filtered.slice(safeOffset, safeOffset + safeLimit) : filtered;
+
+    return res.json({
+      products: paginated,
+      total: filtered.length,
+      fallback: !dbResult.ok,
+    });
+  } catch (error) {
+    const fallbackRows = loadLocalProducts();
+    let filtered = fallbackRows;
+
+    if (category) {
+      filtered = filtered.filter((product) => product.category === category);
+    }
+
+    if (tag) {
+      filtered = filtered.filter((product) => Array.isArray(product.tags) && product.tags.includes(tag));
+    }
+
+    const safeOffset = Number.isFinite(offset) && offset > 0 ? Math.floor(offset) : 0;
+    const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 0;
+    const paginated = safeLimit > 0 ? filtered.slice(safeOffset, safeOffset + safeLimit) : filtered;
+
+    return res.json({
+      products: paginated,
+      total: filtered.length,
+      fallback: true,
+      error: error.message,
+    });
+  }
+});
+
 function sendRootHtml(req, res, fileName) {
   const filePath = path.join(__dirname, fileName);
   if (!fs.existsSync(filePath)) {
@@ -286,6 +347,69 @@ app.get('/api/health', async (req, res) => {
   }
   return res.json({ ok: true, db: false, fallback: true, message: 'Server is running without database' });
 });
+
+app.get('/api/products', async (req, res) => {
+  const category = typeof req.query.category === 'string' ? normalizeCategoryKey(req.query.category) : null;
+  const tag = typeof req.query.tag === 'string' ? String(req.query.tag).trim() : null;
+  const limit = Number(req.query.limit || 0);
+  const offset = Number(req.query.offset || 0);
+
+  const query = `
+    SELECT p.id, p.slug, p.name, p.short_description, p.description, p.price, p.sale_price, p.stock, p.image,
+           p.is_featured, p.is_active, p.brand, c.slug AS category_slug, c.name AS category_name
+    FROM products p
+    LEFT JOIN categories c ON c.id = p.category_id
+    WHERE p.is_active = 1
+    ORDER BY p.is_featured DESC, p.id DESC
+  `;
+
+  try {
+    const dbResult = await getDbOrFallbackRows(query);
+    const rows = dbResult.ok ? dbResult.rows.map(normalizePublicProductRow) : loadLocalProducts();
+    let filtered = rows;
+
+    if (category) {
+      filtered = filtered.filter((product) => product.category === category);
+    }
+
+    if (tag) {
+      filtered = filtered.filter((product) => Array.isArray(product.tags) && product.tags.includes(tag));
+    }
+
+    const safeOffset = Number.isFinite(offset) && offset > 0 ? Math.floor(offset) : 0;
+    const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 0;
+    const paginated = safeLimit > 0 ? filtered.slice(safeOffset, safeOffset + safeLimit) : filtered;
+
+    return res.json({
+      products: paginated,
+      total: filtered.length,
+      fallback: !dbResult.ok,
+    });
+  } catch (error) {
+    const fallbackRows = loadLocalProducts();
+    let filtered = fallbackRows;
+
+    if (category) {
+      filtered = filtered.filter((product) => product.category === category);
+    }
+
+    if (tag) {
+      filtered = filtered.filter((product) => Array.isArray(product.tags) && product.tags.includes(tag));
+    }
+
+    const safeOffset = Number.isFinite(offset) && offset > 0 ? Math.floor(offset) : 0;
+    const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 0;
+    const paginated = safeLimit > 0 ? filtered.slice(safeOffset, safeOffset + safeLimit) : filtered;
+
+    return res.json({
+      products: paginated,
+      total: filtered.length,
+      fallback: true,
+      error: error.message,
+    });
+  }
+});
+
 
 app.post('/api/auth/register', async (req, res) => {
   try {
@@ -663,9 +787,34 @@ async function seedProductsIfNeeded() {
   }
 }
 
+function normalizePublicProductRow(row) {
+  const price = Number(row.price || 0);
+  const salePrice = row.sale_price === null || row.sale_price === undefined ? null : Number(row.sale_price);
+  const finalPrice = salePrice && salePrice > 0 && salePrice < price ? salePrice : price;
+  const oldPrice = salePrice && salePrice > 0 && salePrice < price ? price : null;
+  const discount = oldPrice ? Math.max(0, Math.round(((oldPrice - finalPrice) / oldPrice) * 100)) : 0;
+
+  return {
+    id: row.slug || String(row.id),
+    name: row.name,
+    price: finalPrice,
+    oldPrice,
+    discount,
+    category: row.category_slug || row.category || 'accessory',
+    label: row.category_name || row.category || 'Phụ kiện',
+    image: row.image || '',
+    stock: Number(row.stock || 0) > 0 ? 'Còn hàng' : 'Hết hàng',
+    brand: row.brand || '',
+    summary: row.short_description || row.description || '',
+    specs: [],
+    tags: [row.is_featured ? 'bestSeller' : 'newArrival', row.sale_price ? 'discount' : 'newArrival'],
+  };
+}
+
 async function fetchAdminProducts() {
   const result = await getDbOrFallbackRows(
-    `SELECT p.id, p.name, p.category_id, c.slug AS category, c.name AS category_name, p.price, p.stock, p.image, p.is_active, p.created_at, p.updated_at
+    `SELECT p.id, p.name, p.slug, p.category_id, c.slug AS category, c.name AS category_name, p.brand, p.sku, p.short_description, p.description,
+            p.price, p.sale_price, p.stock, p.image, p.is_featured, p.is_active, p.created_at, p.updated_at
      FROM products p
      LEFT JOIN categories c ON c.id = p.category_id
      ORDER BY p.id DESC`
@@ -676,6 +825,7 @@ async function fetchAdminProducts() {
 
   return [];
 }
+
 
 async function fetchAdminUsers() {
   const result = await getDbOrFallbackRows(
